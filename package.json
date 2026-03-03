@@ -34,7 +34,7 @@
     "chai": "^4.0.0",
     "sinon": "^17.0.0",
     "nock": "^13.0.0",
-    "node-red": "^3.0.0",
+    "node-red": "^4.1.6",
     "node-red-node-test-helper": "^0.3.0"
   },
   "node-red": {
