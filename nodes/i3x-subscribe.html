@@ -1,0 +1,79 @@
+<script type="text/html" data-template-name="i3x-subscribe">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-elementIds"><i class="fa fa-list"></i> Element IDs</label>
+        <input type="text" id="node-input-elementIds" placeholder="comma-separated element IDs to monitor">
+    </div>
+    <div class="form-row">
+        <label for="node-input-mode"><i class="fa fa-exchange"></i> Mode</label>
+        <select id="node-input-mode">
+            <option value="sse">SSE (Server-Sent Events)</option>
+            <option value="poll">Polling (sync)</option>
+        </select>
+    </div>
+    <div class="form-row i3x-sub-poll">
+        <label for="node-input-pollingInterval"><i class="fa fa-clock-o"></i> Poll Interval (ms)</label>
+        <input type="number" id="node-input-pollingInterval" placeholder="5000" min="500" step="500">
+    </div>
+    <div class="form-row">
+        <label for="node-input-maxDepth"><i class="fa fa-level-down"></i> Max Depth</label>
+        <input type="number" id="node-input-maxDepth" placeholder="1" min="0" step="1">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="i3x-subscribe">
+    <p>Subscribes to value changes on one or more i3X objects and emits messages on each update.</p>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object | array</span></dt>
+        <dd>Value change events from the subscription.</dd>
+        <dt>topic <span class="property-type">string</span></dt>
+        <dd>Always <code>i3x/subscription</code>.</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>Creates a server-side subscription via the i3X Subscribe API and monitors the specified elements.</p>
+    <p><b>SSE mode</b> opens a persistent Server-Sent Events stream (<code>GET /subscriptions/{id}/stream</code>)
+    and emits messages in real-time as values change.</p>
+    <p><b>Polling mode</b> periodically calls <code>POST /subscriptions/{id}/sync</code> to retrieve and
+    clear queued updates. If SSE setup fails, the node automatically falls back to polling.</p>
+    <p>The subscription is automatically cleaned up (deleted from the server) when the node is stopped or re-deployed.</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("i3x-subscribe", {
+        category: "i3x",
+        color: "#5DB87C",
+        defaults: {
+            name: { value: "" },
+            server: { value: "", type: "i3x-server", required: true },
+            elementIds: { value: "" },
+            mode: { value: "sse" },
+            pollingInterval: { value: 5000 },
+            maxDepth: { value: 1 },
+        },
+        inputs: 0,
+        outputs: 1,
+        icon: "i3x-icon.svg",
+        paletteLabel: "i3x subscribe",
+        label: function () {
+            return this.name || this.elementIds || "i3x subscribe";
+        },
+        oneditprepare: function () {
+            var mode = $("#node-input-mode");
+            function togglePoll() {
+                $(".i3x-sub-poll").toggle(mode.val() === "poll");
+            }
+            mode.on("change", togglePoll);
+            togglePoll();
+        },
+    });
+</script>

@@ -1,0 +1,8 @@
+node_modules
+.git
+*.log
+*.tgz
+coverage
+.nyc_output
+.DS_Store
+Thumbs.db

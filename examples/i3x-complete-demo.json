@@ -1,0 +1,1272 @@
+[
+    {
+        "id": "i3x-demo-tab",
+        "type": "tab",
+        "label": "i3X Complete Demo",
+        "disabled": false,
+        "info": "Complete demo of all i3X nodes against the public CESMII demo server.\n\n**Server:** https://i3x.cesmii.net\n**Auth:** None (public)\n\nThis flow demonstrates all 5 operation nodes:\n1. **Browse** – Explore the information model\n2. **Read** – Read current values\n3. **Write** – Write values\n4. **History** – Query historical data\n5. **Subscribe** – Monitor value changes"
+    },
+    {
+        "id": "i3x-demo-server",
+        "type": "i3x-server",
+        "name": "CESMII Demo",
+        "baseUrl": "https://i3x.cesmii.net",
+        "apiVersion": "",
+        "authType": "none",
+        "timeout": "10000",
+        "tlsConfig": ""
+    },
+    {
+        "id": "comment-section-browse",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 1. BROWSE - Explore the information model ===",
+        "info": "The **i3x-browse** node explores the i3X information model.\n\nThe i3X API is graph-based: objects have types, belong to namespaces, and are connected through relationships.\n\n**Browse targets:**\n- `namespaces` – All available namespaces\n- `objecttypes` – Type definitions (schemas)\n- `relationshiptypes` – Relationship type definitions (e.g. HasChildren)\n- `objects` – Object instances\n- `related` – Graph traversal (related objects)\n\nClick the inject nodes on the left to execute the queries.",
+        "x": 310,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "inject-ns",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Get Namespaces",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 100,
+        "wires": [
+            [
+                "browse-ns"
+            ]
+        ]
+    },
+    {
+        "id": "browse-ns",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "Namespaces",
+        "server": "i3x-demo-server",
+        "browseTarget": "namespaces",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": false,
+        "relationshipType": "",
+        "x": 380,
+        "y": 100,
+        "wires": [
+            [
+                "debug-ns"
+            ]
+        ]
+    },
+    {
+        "id": "debug-ns",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Namespaces",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload.length",
+        "statusType": "msg",
+        "x": 580,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "inject-types",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Get Object Types",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 160,
+        "wires": [
+            [
+                "browse-types"
+            ]
+        ]
+    },
+    {
+        "id": "browse-types",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "Object Types",
+        "server": "i3x-demo-server",
+        "browseTarget": "objecttypes",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": false,
+        "relationshipType": "",
+        "x": 390,
+        "y": 160,
+        "wires": [
+            [
+                "debug-types"
+            ]
+        ]
+    },
+    {
+        "id": "debug-types",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Object Types",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 590,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "inject-reltypes",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Relationship Types",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 220,
+        "wires": [
+            [
+                "browse-reltypes"
+            ]
+        ]
+    },
+    {
+        "id": "browse-reltypes",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "Relationship Types",
+        "server": "i3x-demo-server",
+        "browseTarget": "relationshiptypes",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": false,
+        "relationshipType": "",
+        "x": 410,
+        "y": 220,
+        "wires": [
+            [
+                "debug-reltypes"
+            ]
+        ]
+    },
+    {
+        "id": "debug-reltypes",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Rel. Types",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 610,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "inject-objects",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> List All Objects",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 280,
+        "wires": [
+            [
+                "browse-objects"
+            ]
+        ]
+    },
+    {
+        "id": "browse-objects",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "All Objects",
+        "server": "i3x-demo-server",
+        "browseTarget": "objects",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": true,
+        "relationshipType": "",
+        "x": 380,
+        "y": 280,
+        "wires": [
+            [
+                "debug-objects"
+            ]
+        ]
+    },
+    {
+        "id": "debug-objects",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Objects",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 580,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "inject-objects-filter",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Filter Objects by Type",
+        "props": [
+            {
+                "p": "typeId",
+                "v": "work-unit-type",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 170,
+        "y": 340,
+        "wires": [
+            [
+                "browse-objects-filter"
+            ]
+        ]
+    },
+    {
+        "id": "browse-objects-filter",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "Objects (work-unit-type)",
+        "server": "i3x-demo-server",
+        "browseTarget": "objects",
+        "elementId": "",
+        "typeId": "work-unit-type",
+        "namespaceUri": "",
+        "includeMetadata": false,
+        "relationshipType": "",
+        "x": 430,
+        "y": 340,
+        "wires": [
+            [
+                "debug-objects-filter"
+            ]
+        ]
+    },
+    {
+        "id": "debug-objects-filter",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Filtered Objects",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 660,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "inject-related",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Related Objects (pump-station)",
+        "props": [
+            {
+                "p": "elementId",
+                "v": "pump-station",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 200,
+        "y": 400,
+        "wires": [
+            [
+                "browse-related"
+            ]
+        ]
+    },
+    {
+        "id": "browse-related",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "Related Objects",
+        "server": "i3x-demo-server",
+        "browseTarget": "related",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": true,
+        "relationshipType": "",
+        "x": 430,
+        "y": 400,
+        "wires": [
+            [
+                "debug-related"
+            ]
+        ]
+    },
+    {
+        "id": "debug-related",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Related",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 620,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "inject-by-id",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Load Object by ID",
+        "props": [
+            {
+                "p": "elementId",
+                "v": "pump-101",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 460,
+        "wires": [
+            [
+                "browse-by-id"
+            ]
+        ]
+    },
+    {
+        "id": "browse-by-id",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "Object by ID",
+        "server": "i3x-demo-server",
+        "browseTarget": "objects",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": true,
+        "relationshipType": "",
+        "x": 390,
+        "y": 460,
+        "wires": [
+            [
+                "debug-by-id"
+            ]
+        ]
+    },
+    {
+        "id": "debug-by-id",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Object Detail",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 590,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "comment-section-read",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 2. READ - Read current values ===",
+        "info": "The **i3x-read** node reads the last known values of one or more objects.\n\n**API endpoint:** `POST /objects/value`\n\n**Key parameters:**\n- `elementIds` – Which objects to read (comma-separated or array)\n- `maxDepth` – Recursion depth:\n  - `1` = this element only (default)\n  - `0` = infinite depth (include all child components)\n\n**Analogy:** Comparable to OPC UA Read or S7 IN.",
+        "x": 280,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "inject-read-single",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Read Single Value (pump-101-state)",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 220,
+        "y": 600,
+        "wires": [
+            [
+                "read-single"
+            ]
+        ]
+    },
+    {
+        "id": "read-single",
+        "type": "i3x-read",
+        "z": "i3x-demo-tab",
+        "name": "Pump State",
+        "server": "i3x-demo-server",
+        "elementIds": "pump-101-state",
+        "maxDepth": "1",
+        "x": 460,
+        "y": 600,
+        "wires": [
+            [
+                "debug-read-single"
+            ]
+        ]
+    },
+    {
+        "id": "debug-read-single",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Pump State Value",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 660,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "inject-read-multi",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Read Multiple Values",
+        "props": [
+            {
+                "p": "elementIds",
+                "v": "[\"pump-101-state\",\"pump-101-bearing-temperature\"]",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 170,
+        "y": 660,
+        "wires": [
+            [
+                "read-multi"
+            ]
+        ]
+    },
+    {
+        "id": "read-multi",
+        "type": "i3x-read",
+        "z": "i3x-demo-tab",
+        "name": "State + Temperature",
+        "server": "i3x-demo-server",
+        "elementIds": "",
+        "maxDepth": "1",
+        "x": 460,
+        "y": 660,
+        "wires": [
+            [
+                "debug-read-multi"
+            ]
+        ]
+    },
+    {
+        "id": "debug-read-multi",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Multiple Values",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 660,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "inject-read-deep",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Recursive Read (pump-101, depth=0)",
+        "props": [
+            {
+                "p": "maxDepth",
+                "v": "0",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 210,
+        "y": 720,
+        "wires": [
+            [
+                "read-deep"
+            ]
+        ]
+    },
+    {
+        "id": "read-deep",
+        "type": "i3x-read",
+        "z": "i3x-demo-tab",
+        "name": "Pump-101 (recursive)",
+        "server": "i3x-demo-server",
+        "elementIds": "pump-101",
+        "maxDepth": "1",
+        "x": 470,
+        "y": 720,
+        "wires": [
+            [
+                "debug-read-deep"
+            ]
+        ]
+    },
+    {
+        "id": "debug-read-deep",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "All Nested Values",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 670,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "comment-section-write",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 3. WRITE - Write values ===",
+        "info": "The **i3x-write** node writes a value to an i3X object.\n\n**API endpoint:** `PUT /objects/{elementId}/value`\n\n**Input:**\n- `msg.payload` - The value to write (must match the element's type schema)\n- `msg.elementId` or node property - Target element\n\n**Output:**\n- `msg.payload` - Server confirmation (`{ success, message }`)\n- `msg.elementId` - The element ID that was written to\n\n**Payload format depends on the element type:**\n- `state-type` → object: `{ description, color, type: { id, name, description }, metadata: { ... } }`\n- `measurement-value-type` / `sensor-type` → plain number (e.g. `72.5`)\n- `measurement-health-type` → integer (e.g. `95`)\n\n**Analogy:** Comparable to OPC UA Write or S7 OUT.",
+        "x": 270,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "inject-write",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Write State (object)",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"description\":\"Pump is running\",\"color\":\"#00FF00\",\"type\":{\"id\":1,\"name\":\"Running\",\"description\":\"Equipment running normally\"},\"metadata\":{\"source\":\"node-red\",\"uri\":\"demo-flow\",\"asset\":{\"id\":0,\"name\":\"Pump-101\",\"description\":\"Centrifugal water pump\"}}}",
+                "vt": "json"
+            },
+            {
+                "p": "elementId",
+                "v": "pump-101-state",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 860,
+        "wires": [
+            [
+                "write-node"
+            ]
+        ]
+    },
+    {
+        "id": "write-node",
+        "type": "i3x-write",
+        "z": "i3x-demo-tab",
+        "name": "Write pump-101-state",
+        "server": "i3x-demo-server",
+        "elementId": "",
+        "x": 430,
+        "y": 860,
+        "wires": [
+            [
+                "debug-write"
+            ]
+        ]
+    },
+    {
+        "id": "debug-write",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Write Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 650,
+        "y": 860,
+        "wires": []
+    },
+    {
+        "id": "inject-write-dynamic",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Dynamic Write (numeric value via msg)",
+        "props": [
+            {
+                "p": "payload",
+                "v": "72.5",
+                "vt": "num"
+            },
+            {
+                "p": "elementId",
+                "v": "pump-101-measurements-bearing-temperature-value",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 210,
+        "y": 920,
+        "wires": [
+            [
+                "write-dynamic"
+            ]
+        ]
+    },
+    {
+        "id": "write-dynamic",
+        "type": "i3x-write",
+        "z": "i3x-demo-tab",
+        "name": "Write (dynamic)",
+        "server": "i3x-demo-server",
+        "elementId": "",
+        "x": 430,
+        "y": 920,
+        "wires": [
+            [
+                "debug-write-dynamic"
+            ]
+        ]
+    },
+    {
+        "id": "debug-write-dynamic",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Write Dyn. Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 660,
+        "y": 920,
+        "wires": []
+    },
+    {
+        "id": "inject-write-history",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Write History",
+        "props": [
+            {
+                "p": "payload",
+                "v": "[{\"value\":68.2,\"quality\":\"GOOD\",\"timestamp\":\"2025-06-01T10:00:00Z\"},{\"value\":69.1,\"quality\":\"GOOD\",\"timestamp\":\"2025-06-01T10:05:00Z\"},{\"value\":70.5,\"quality\":\"GOOD\",\"timestamp\":\"2025-06-01T10:10:00Z\"}]",
+                "vt": "json"
+            },
+            {
+                "p": "elementId",
+                "v": "pump-101-measurements-bearing-temperature-value",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 980,
+        "wires": [
+            [
+                "write-history-node"
+            ]
+        ]
+    },
+    {
+        "id": "write-history-node",
+        "type": "i3x-write",
+        "z": "i3x-demo-tab",
+        "name": "Write History",
+        "server": "i3x-demo-server",
+        "writeTarget": "history",
+        "elementId": "",
+        "x": 430,
+        "y": 980,
+        "wires": [
+            [
+                "debug-write-history"
+            ]
+        ]
+    },
+    {
+        "id": "debug-write-history",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Write History Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 670,
+        "y": 980,
+        "wires": []
+    },
+    {
+        "id": "comment-section-history",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 4. HISTORY - Query historical data ===",
+        "info": "The **i3x-history** node queries historical time-series data.\n\n**API endpoint:** `POST /objects/history`\n\n**Time formats:**\n- ISO 8601: `2025-01-01T00:00:00Z`\n- Relative: `-30s`, `-5m`, `-1h`, `-7d`, `-1w`\n\n**Parameters:**\n- `elementIds` – Which objects to query\n- `startTime` – Start of time range\n- `endTime` – End of time range (default: now)\n- `maxDepth` – Recursion into child objects\n\n**Analogy:** Comparable to a historian query node.",
+        "x": 300,
+        "y": 1060,
+        "wires": []
+    },
+    {
+        "id": "inject-history-1h",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Last Hour",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 1120,
+        "wires": [
+            [
+                "history-1h"
+            ]
+        ]
+    },
+    {
+        "id": "history-1h",
+        "type": "i3x-history",
+        "z": "i3x-demo-tab",
+        "name": "pump-101 (last 1h)",
+        "server": "i3x-demo-server",
+        "elementIds": "pump-101-bearing-temperature",
+        "startTime": "-1h",
+        "endTime": "",
+        "maxDepth": "1",
+        "x": 430,
+        "y": 1120,
+        "wires": [
+            [
+                "debug-history-1h"
+            ]
+        ]
+    },
+    {
+        "id": "debug-history-1h",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "History 1h",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 650,
+        "y": 1120,
+        "wires": []
+    },
+    {
+        "id": "inject-history-7d",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Last 7 Days",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 1180,
+        "wires": [
+            [
+                "history-7d"
+            ]
+        ]
+    },
+    {
+        "id": "history-7d",
+        "type": "i3x-history",
+        "z": "i3x-demo-tab",
+        "name": "pump-101 (last 7d)",
+        "server": "i3x-demo-server",
+        "elementIds": "pump-101",
+        "startTime": "-7d",
+        "endTime": "",
+        "maxDepth": "0",
+        "x": 430,
+        "y": 1180,
+        "wires": [
+            [
+                "debug-history-7d"
+            ]
+        ]
+    },
+    {
+        "id": "debug-history-7d",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "History 7d (deep)",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 660,
+        "y": 1180,
+        "wires": []
+    },
+    {
+        "id": "inject-history-range",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Dynamic Time Range via msg",
+        "props": [
+            {
+                "p": "elementIds",
+                "v": "[\"pump-101-state\",\"pump-101-bearing-temperature\"]",
+                "vt": "json"
+            },
+            {
+                "p": "startTime",
+                "v": "-24h",
+                "vt": "str"
+            },
+            {
+                "p": "endTime",
+                "v": "-1h",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 190,
+        "y": 1240,
+        "wires": [
+            [
+                "history-range"
+            ]
+        ]
+    },
+    {
+        "id": "history-range",
+        "type": "i3x-history",
+        "z": "i3x-demo-tab",
+        "name": "Multiple IDs (dynamic)",
+        "server": "i3x-demo-server",
+        "elementIds": "",
+        "startTime": "-1h",
+        "endTime": "",
+        "maxDepth": "1",
+        "x": 450,
+        "y": 1240,
+        "wires": [
+            [
+                "debug-history-range"
+            ]
+        ]
+    },
+    {
+        "id": "debug-history-range",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "History Range",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 660,
+        "y": 1240,
+        "wires": []
+    },
+    {
+        "id": "comment-section-subscribe",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 5. SUBSCRIBE - Monitor value changes ===",
+        "info": "The **i3x-subscribe** node monitors value changes and outputs a message on each update.\n\n**Modes:**\n- **SSE** (Server-Sent Events) – Real-time stream via `GET /subscriptions/{id}/stream`\n- **Polling** – Periodic sync via `POST /subscriptions/{id}/sync`\n\n**Behaviour:**\n- Automatically creates a subscription on deploy\n- Registers the specified element IDs as monitored items\n- Automatically deletes the subscription on stop/re-deploy\n- If SSE fails, automatically falls back to polling\n\n**Analogy:** Comparable to MQTT IN or OPC UA Subscription.\n\n**Note:** This node has no input – it starts automatically on deploy.",
+        "x": 310,
+        "y": 1320,
+        "wires": []
+    },
+    {
+        "id": "subscribe-sse",
+        "type": "i3x-subscribe",
+        "z": "i3x-demo-tab",
+        "name": "SSE Stream (pump-101)",
+        "server": "i3x-demo-server",
+        "elementIds": "pump-101-state,pump-101-bearing-temperature",
+        "mode": "sse",
+        "pollingInterval": "5000",
+        "maxDepth": "1",
+        "x": 170,
+        "y": 1400,
+        "wires": [
+            [
+                "debug-subscribe-sse"
+            ]
+        ]
+    },
+    {
+        "id": "debug-subscribe-sse",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "SSE Events",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 410,
+        "y": 1400,
+        "wires": []
+    },
+    {
+        "id": "subscribe-poll",
+        "type": "i3x-subscribe",
+        "z": "i3x-demo-tab",
+        "name": "Polling (pump-station, 10s)",
+        "server": "i3x-demo-server",
+        "elementIds": "pump-station",
+        "mode": "poll",
+        "pollingInterval": "10000",
+        "maxDepth": "0",
+        "x": 180,
+        "y": 1460,
+        "wires": [
+            [
+                "debug-subscribe-poll"
+            ]
+        ]
+    },
+    {
+        "id": "debug-subscribe-poll",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Poll Updates",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 420,
+        "y": 1460,
+        "wires": []
+    },
+    {
+        "id": "comment-section-advanced",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 6. EXAMPLE - Browse then Read Pipeline ===",
+        "info": "This example shows a typical chaining pattern:\n\n1. **Browse** all objects\n2. **Function** extracts the element IDs\n3. **Read** fetches the values for all discovered objects\n\nThis pattern is useful when you don't know in advance which objects exist on the server.",
+        "x": 320,
+        "y": 1540,
+        "wires": []
+    },
+    {
+        "id": "inject-pipeline",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Browse then Read Pipeline",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 180,
+        "y": 1600,
+        "wires": [
+            [
+                "pipeline-browse"
+            ]
+        ]
+    },
+    {
+        "id": "pipeline-browse",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "1. All Objects",
+        "server": "i3x-demo-server",
+        "browseTarget": "objects",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": false,
+        "relationshipType": "",
+        "x": 390,
+        "y": 1600,
+        "wires": [
+            [
+                "pipeline-extract"
+            ]
+        ]
+    },
+    {
+        "id": "pipeline-extract",
+        "type": "function",
+        "z": "i3x-demo-tab",
+        "name": "2. Extract Element IDs",
+        "func": "const ids = msg.payload.map(obj => obj.elementId);\n\nmsg.elementIds = ids;\nmsg.payload = {\n    count: ids.length,\n    ids: ids\n};\n\nnode.status({text: ids.length + \" objects found\"});\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 1600,
+        "wires": [
+            [
+                "pipeline-read",
+                "debug-pipeline-ids"
+            ]
+        ]
+    },
+    {
+        "id": "debug-pipeline-ids",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "Discovered IDs",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 860,
+        "y": 1560,
+        "wires": []
+    },
+    {
+        "id": "pipeline-read",
+        "type": "i3x-read",
+        "z": "i3x-demo-tab",
+        "name": "3. Read All Values",
+        "server": "i3x-demo-server",
+        "elementIds": "",
+        "maxDepth": "0",
+        "x": 860,
+        "y": 1600,
+        "wires": [
+            [
+                "debug-pipeline-values"
+            ]
+        ]
+    },
+    {
+        "id": "debug-pipeline-values",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "All Values",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1060,
+        "y": 1600,
+        "wires": []
+    },
+    {
+        "id": "comment-section-chain2",
+        "type": "comment",
+        "z": "i3x-demo-tab",
+        "name": "=== 7. EXAMPLE - Related then History Pipeline ===",
+        "info": "Graph traversal combined with historian query:\n\n1. **Browse related** – Find all children of pump-station\n2. **Function** – Extract IDs of composition objects\n3. **History** – Query historical data for the last 24 hours\n\nDemonstrates how to combine graph relationships with time-series queries.",
+        "x": 330,
+        "y": 1680,
+        "wires": []
+    },
+    {
+        "id": "inject-chain2",
+        "type": "inject",
+        "z": "i3x-demo-tab",
+        "name": ">> Related then History Pipeline",
+        "props": [
+            {
+                "p": "elementId",
+                "v": "pump-station",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 190,
+        "y": 1740,
+        "wires": [
+            [
+                "chain2-browse"
+            ]
+        ]
+    },
+    {
+        "id": "chain2-browse",
+        "type": "i3x-browse",
+        "z": "i3x-demo-tab",
+        "name": "1. Related of pump-station",
+        "server": "i3x-demo-server",
+        "browseTarget": "related",
+        "elementId": "",
+        "typeId": "",
+        "namespaceUri": "",
+        "includeMetadata": false,
+        "relationshipType": "",
+        "x": 440,
+        "y": 1740,
+        "wires": [
+            [
+                "chain2-extract"
+            ]
+        ]
+    },
+    {
+        "id": "chain2-extract",
+        "type": "function",
+        "z": "i3x-demo-tab",
+        "name": "2. Filter Composition IDs",
+        "func": "const compositions = msg.payload.filter(obj => obj.isComposition);\nconst ids = compositions.map(obj => obj.elementId);\n\nmsg.elementIds = ids;\nmsg.startTime = \"-24h\";\n\nnode.status({text: ids.length + \" composition objects\"});\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 680,
+        "y": 1740,
+        "wires": [
+            [
+                "chain2-history"
+            ]
+        ]
+    },
+    {
+        "id": "chain2-history",
+        "type": "i3x-history",
+        "z": "i3x-demo-tab",
+        "name": "3. History (24h)",
+        "server": "i3x-demo-server",
+        "elementIds": "",
+        "startTime": "",
+        "endTime": "",
+        "maxDepth": "0",
+        "x": 900,
+        "y": 1740,
+        "wires": [
+            [
+                "debug-chain2"
+            ]
+        ]
+    },
+    {
+        "id": "debug-chain2",
+        "type": "debug",
+        "z": "i3x-demo-tab",
+        "name": "History Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1100,
+        "y": 1740,
+        "wires": []
+    }
+]

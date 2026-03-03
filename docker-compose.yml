@@ -1,0 +1,31 @@
+services:
+  test:
+    build: .
+    command: npm test
+    environment:
+      - I3X_BASE_URL=https://i3x.cesmii.net
+
+  test-unit:
+    build: .
+    command: npm run test:unit
+
+  test-integration:
+    build: .
+    command: npm run test:integration
+    environment:
+      - I3X_BASE_URL=https://i3x.cesmii.net
+
+  node-red:
+    image: nodered/node-red:latest
+    ports:
+      - "18880:1880"
+    volumes:
+      - .:/app/node-red-contrib-i3x:ro
+      - node-red-data:/data
+    environment:
+      - NODE_RED_CREDENTIAL_SECRET=testsecret
+    entrypoint: >
+      sh -c "cd /usr/src/node-red && npm install /app/node-red-contrib-i3x && cp -f /app/node-red-contrib-i3x/examples/i3x-complete-demo.json /data/flows.json && node-red --userDir /data"
+
+volumes:
+  node-red-data:

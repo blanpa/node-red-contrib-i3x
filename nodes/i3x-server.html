@@ -1,0 +1,98 @@
+<script type="text/html" data-template-name="i3x-server">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="i3X Server">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-baseUrl"><i class="fa fa-globe"></i> Base URL</label>
+        <input type="text" id="node-config-input-baseUrl" placeholder="https://i3x.cesmii.net">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-apiVersion"><i class="fa fa-code-fork"></i> API Version</label>
+        <input type="text" id="node-config-input-apiVersion" placeholder="v0 (leave empty for current)">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-authType"><i class="fa fa-lock"></i> Auth Type</label>
+        <select id="node-config-input-authType">
+            <option value="none">None</option>
+            <option value="basic">Basic Auth</option>
+            <option value="bearer">Bearer Token</option>
+            <option value="apikey">API Key</option>
+        </select>
+    </div>
+    <div class="form-row i3x-auth-basic">
+        <label for="node-config-input-username"><i class="fa fa-user"></i> Username</label>
+        <input type="text" id="node-config-input-username">
+    </div>
+    <div class="form-row i3x-auth-basic">
+        <label for="node-config-input-password"><i class="fa fa-key"></i> Password</label>
+        <input type="password" id="node-config-input-password">
+    </div>
+    <div class="form-row i3x-auth-bearer">
+        <label for="node-config-input-token"><i class="fa fa-ticket"></i> Token</label>
+        <input type="password" id="node-config-input-token">
+    </div>
+    <div class="form-row i3x-auth-apikey">
+        <label for="node-config-input-apiKey"><i class="fa fa-key"></i> API Key</label>
+        <input type="password" id="node-config-input-apiKey">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-tlsConfig"><i class="fa fa-shield"></i> TLS</label>
+        <input type="text" id="node-config-input-tlsConfig">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-config-input-timeout" placeholder="10000" min="1000" step="1000">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="i3x-server">
+    <p>Configuration node for an i3X API server connection.</p>
+    <h3>Properties</h3>
+    <dl class="message-properties">
+        <dt>Base URL <span class="property-type">string</span></dt>
+        <dd>The root URL of the i3X API server, e.g. <code>https://i3x.cesmii.net</code>.</dd>
+        <dt>API Version <span class="property-type">string</span></dt>
+        <dd>Optional path prefix for versioned endpoints (e.g. <code>v0</code>). Leave empty for current default.</dd>
+        <dt>Auth Type <span class="property-type">select</span></dt>
+        <dd>Authentication method: None, Basic Auth, Bearer Token, or API Key.</dd>
+        <dt>TLS <span class="property-type">tls-config</span></dt>
+        <dd>Optional TLS configuration for custom certificates.</dd>
+        <dt>Timeout <span class="property-type">number</span></dt>
+        <dd>HTTP request timeout in milliseconds (default 10000).</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("i3x-server", {
+        category: "config",
+        defaults: {
+            name: { value: "" },
+            baseUrl: { value: "", required: true },
+            apiVersion: { value: "" },
+            authType: { value: "none" },
+            tlsConfig: { value: "", type: "tls-config", required: false },
+            timeout: { value: 10000 },
+        },
+        credentials: {
+            username: { type: "text" },
+            password: { type: "password" },
+            token: { type: "password" },
+            apiKey: { type: "password" },
+        },
+        label: function () {
+            return this.name || this.baseUrl || "i3x server";
+        },
+        oneditprepare: function () {
+            var authType = $("#node-config-input-authType");
+            function toggleAuth() {
+                var val = authType.val();
+                $(".i3x-auth-basic").toggle(val === "basic");
+                $(".i3x-auth-bearer").toggle(val === "bearer");
+                $(".i3x-auth-apikey").toggle(val === "apikey");
+            }
+            authType.on("change", toggleAuth);
+            toggleAuth();
+        },
+    });
+</script>

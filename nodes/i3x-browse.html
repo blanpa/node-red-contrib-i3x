@@ -1,0 +1,106 @@
+<script type="text/html" data-template-name="i3x-browse">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-browseTarget"><i class="fa fa-sitemap"></i> Target</label>
+        <select id="node-input-browseTarget">
+            <option value="namespaces">Namespaces</option>
+            <option value="objecttypes">Object Types</option>
+            <option value="relationshiptypes">Relationship Types</option>
+            <option value="objects">Objects</option>
+            <option value="related">Related Objects</option>
+        </select>
+    </div>
+    <div class="form-row i3x-browse-elementId">
+        <label for="node-input-elementId"><i class="fa fa-crosshairs"></i> Element ID</label>
+        <input type="text" id="node-input-elementId" placeholder="optional – filter by element ID">
+    </div>
+    <div class="form-row i3x-browse-typeId">
+        <label for="node-input-typeId"><i class="fa fa-filter"></i> Type ID</label>
+        <input type="text" id="node-input-typeId" placeholder="optional – filter objects by type">
+    </div>
+    <div class="form-row i3x-browse-ns">
+        <label for="node-input-namespaceUri"><i class="fa fa-folder-o"></i> Namespace</label>
+        <input type="text" id="node-input-namespaceUri" placeholder="optional – filter by namespace URI">
+    </div>
+    <div class="form-row i3x-browse-rel">
+        <label for="node-input-relationshipType"><i class="fa fa-link"></i> Rel. Type</label>
+        <input type="text" id="node-input-relationshipType" placeholder="optional – filter by relationship type">
+    </div>
+    <div class="form-row i3x-browse-meta">
+        <label for="node-input-includeMetadata"><i class="fa fa-info-circle"></i> Metadata</label>
+        <input type="checkbox" id="node-input-includeMetadata" style="width:auto;">
+        <span> Include full metadata</span>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="i3x-browse">
+    <p>Explores the i3X information model – namespaces, object types, relationship types, objects, and related objects.</p>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">browseTarget <span class="property-type">string</span></dt>
+        <dd>What to browse: <code>namespaces</code>, <code>objecttypes</code>, <code>relationshiptypes</code>, <code>objects</code>, or <code>related</code>.</dd>
+        <dt class="optional">elementId <span class="property-type">string | string[]</span></dt>
+        <dd>One or more element IDs to query directly.</dd>
+        <dt class="optional">typeId <span class="property-type">string</span></dt>
+        <dd>Filter objects by type ID (only for <code>objects</code> target).</dd>
+        <dt class="optional">namespaceUri <span class="property-type">string</span></dt>
+        <dd>Filter by namespace URI (for <code>objecttypes</code> / <code>relationshiptypes</code>).</dd>
+        <dt class="optional">relationshipType <span class="property-type">string</span></dt>
+        <dd>Filter related objects by relationship type.</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">array</span></dt>
+        <dd>Array of discovered objects matching the browse criteria.</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>This node talks to the <b>Explore</b> endpoints of the i3X API.
+    <code>msg</code> properties override the values configured in the node editor.</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("i3x-browse", {
+        category: "i3x",
+        color: "#5DB87C",
+        defaults: {
+            name: { value: "" },
+            server: { value: "", type: "i3x-server", required: true },
+            browseTarget: { value: "objects" },
+            elementId: { value: "" },
+            typeId: { value: "" },
+            namespaceUri: { value: "" },
+            includeMetadata: { value: false },
+            relationshipType: { value: "" },
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "i3x-icon.svg",
+        paletteLabel: "i3x browse",
+        label: function () {
+            return this.name || this.browseTarget || "i3x browse";
+        },
+        oneditprepare: function () {
+            var target = $("#node-input-browseTarget");
+            function toggle() {
+                var v = target.val();
+                $(".i3x-browse-elementId").toggle(v !== "namespaces");
+                $(".i3x-browse-typeId").toggle(v === "objects");
+                $(".i3x-browse-ns").toggle(v === "objecttypes" || v === "relationshiptypes");
+                $(".i3x-browse-rel").toggle(v === "related");
+                $(".i3x-browse-meta").toggle(v === "objects" || v === "related");
+            }
+            target.on("change", toggle);
+            toggle();
+        },
+    });
+</script>

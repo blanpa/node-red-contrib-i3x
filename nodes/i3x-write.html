@@ -1,0 +1,72 @@
+<script type="text/html" data-template-name="i3x-write">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-writeTarget"><i class="fa fa-bullseye"></i> Target</label>
+        <select id="node-input-writeTarget">
+            <option value="value">Current Value</option>
+            <option value="history">Historical Data</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-elementId"><i class="fa fa-crosshairs"></i> Element ID</label>
+        <input type="text" id="node-input-elementId" placeholder="target element ID">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="i3x-write">
+    <p>Writes a current value or historical data to an i3X object.</p>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">any</span></dt>
+        <dd>The value to write. Format depends on the element type schema.</dd>
+        <dt class="optional">elementId <span class="property-type">string</span></dt>
+        <dd>Target element ID. Overrides the configured value. Also accepts <code>msg.nodeId</code>.</dd>
+        <dt class="optional">writeTarget <span class="property-type">string</span></dt>
+        <dd><code>"value"</code> (default) or <code>"history"</code>. Overrides the configured target.</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object</span></dt>
+        <dd>Write confirmation response from the API.</dd>
+        <dt>elementId <span class="property-type">string</span></dt>
+        <dd>The element ID that was written to.</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>When <b>Target</b> is set to <i>Current Value</i>, uses <code>PUT /objects/{elementId}/value</code>
+    to update the current value of the object.</p>
+    <p>When <b>Target</b> is set to <i>Historical Data</i>, uses <code>PUT /objects/{elementId}/history</code>
+    to write historical time-series records.</p>
+    <p>The payload format must match the element's type schema (e.g. a plain number for
+    <code>measurement-value-type</code>, or a state object for <code>state-type</code>).</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("i3x-write", {
+        category: "i3x",
+        color: "#5DB87C",
+        defaults: {
+            name: { value: "" },
+            server: { value: "", type: "i3x-server", required: true },
+            writeTarget: { value: "value" },
+            elementId: { value: "" },
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "i3x-icon.svg",
+        paletteLabel: "i3x write",
+        label: function () {
+            return this.name || this.elementId || "i3x write";
+        },
+        align: "right",
+    });
+</script>

@@ -1,0 +1,15 @@
+test/
+coverage/
+.nyc_output/
+.git/
+.github/
+.dockerignore
+.editorconfig
+.gitignore
+Dockerfile
+docker-compose.yml
+*.log
+*.tgz
+.DS_Store
+Thumbs.db
+agent-transcripts/

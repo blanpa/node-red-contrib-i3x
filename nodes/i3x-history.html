@@ -1,0 +1,75 @@
+<script type="text/html" data-template-name="i3x-history">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-elementIds"><i class="fa fa-list"></i> Element IDs</label>
+        <input type="text" id="node-input-elementIds" placeholder="comma-separated element IDs">
+    </div>
+    <div class="form-row">
+        <label for="node-input-startTime"><i class="fa fa-clock-o"></i> Start Time</label>
+        <input type="text" id="node-input-startTime" placeholder="ISO 8601 or relative (e.g. -1h, -7d)">
+    </div>
+    <div class="form-row">
+        <label for="node-input-endTime"><i class="fa fa-clock-o"></i> End Time</label>
+        <input type="text" id="node-input-endTime" placeholder="ISO 8601 or relative (default: now)">
+    </div>
+    <div class="form-row">
+        <label for="node-input-maxDepth"><i class="fa fa-level-down"></i> Max Depth</label>
+        <input type="number" id="node-input-maxDepth" placeholder="1" min="0" step="1">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="i3x-history">
+    <p>Queries historical values for one or more i3X objects.</p>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">elementIds <span class="property-type">string | string[]</span></dt>
+        <dd>Element IDs to query history for. Also accepts <code>msg.nodeIds</code>.</dd>
+        <dt class="optional">startTime <span class="property-type">string</span></dt>
+        <dd>Start of the time range. ISO 8601 timestamp or relative notation (<code>-1h</code>, <code>-7d</code>, <code>-30m</code>).</dd>
+        <dt class="optional">endTime <span class="property-type">string</span></dt>
+        <dd>End of the time range. Defaults to current time.</dd>
+        <dt class="optional">maxDepth <span class="property-type">number</span></dt>
+        <dd>Recursion depth. <code>0</code> = infinite, <code>1</code> = no recursion (default).</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">array</span></dt>
+        <dd>Historical time-series data returned by the API.</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>Uses <code>POST /objects/history</code>. Time values support both ISO 8601 and
+    relative notation: <code>-30s</code> (seconds), <code>-5m</code> (minutes), <code>-1h</code> (hours),
+    <code>-7d</code> (days), <code>-1w</code> (weeks).</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("i3x-history", {
+        category: "i3x",
+        color: "#5DB87C",
+        defaults: {
+            name: { value: "" },
+            server: { value: "", type: "i3x-server", required: true },
+            elementIds: { value: "" },
+            startTime: { value: "-1h" },
+            endTime: { value: "" },
+            maxDepth: { value: 1 },
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "i3x-icon.svg",
+        paletteLabel: "i3x history",
+        label: function () {
+            return this.name || this.elementIds || "i3x history";
+        },
+    });
+</script>
