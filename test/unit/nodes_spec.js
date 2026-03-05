@@ -363,7 +363,7 @@ describe("i3x Node-RED Nodes", function () {
         it("should write value to elementId", function (done) {
             nock(BASE).get("/namespaces").reply(200, []);
             nock(BASE)
-                .put("/objects/sensor-001/value", { temp: 99.5 })
+                .put("/objects/sensor-001/value", { value: 99.5 })
                 .reply(200, { status: "ok" });
 
             const flow = [
@@ -384,7 +384,7 @@ describe("i3x Node-RED Nodes", function () {
                     expect(msg.elementId).to.equal("sensor-001");
                     done();
                 });
-                helper.getNode("write1").receive({ payload: { temp: 99.5 } });
+                helper.getNode("write1").receive({ payload: { value: 99.5 } });
             });
         });
 

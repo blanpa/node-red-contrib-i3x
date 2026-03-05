@@ -451,5 +451,155 @@ describe("I3XClient", function () {
             expect(closeSpy.calledOnce).to.equal(true);
             expect(client._activeSubscriptions.size).to.equal(0);
         });
+
+        it("should clear cache", function () {
+            client = new I3XClient({ baseUrl: BASE });
+            client._cache.set("test-key", [1, 2, 3]);
+            expect(client._cache.get("test-key")).to.deep.equal([1, 2, 3]);
+            client.destroy();
+            expect(client._cache.get("test-key")).to.be.undefined;
+        });
+    });
+
+    // ── Caching ─────────────────────────────────────────────────
+
+    describe("caching", function () {
+        it("should cache getNamespaces results", async function () {
+            const data = [{ uri: "urn:cached", displayName: "Cached" }];
+            const scope = nock(BASE).get("/namespaces").once().reply(200, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const r1 = await client.getNamespaces();
+            const r2 = await client.getNamespaces();
+            expect(r1).to.deep.equal(data);
+            expect(r2).to.deep.equal(data);
+            expect(scope.isDone()).to.be.true;
+        });
+
+        it("should cache getObjectTypes per namespaceUri", async function () {
+            const data1 = [{ elementId: "t1" }];
+            const data2 = [{ elementId: "t2" }];
+            nock(BASE).get("/objecttypes").once().reply(200, data1);
+            nock(BASE).get("/objecttypes").query({ namespaceUri: "urn:ns" }).once().reply(200, data2);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const r1 = await client.getObjectTypes();
+            const r2 = await client.getObjectTypes();
+            const r3 = await client.getObjectTypes({ namespaceUri: "urn:ns" });
+            const r4 = await client.getObjectTypes({ namespaceUri: "urn:ns" });
+            expect(r1).to.deep.equal(data1);
+            expect(r2).to.deep.equal(data1);
+            expect(r3).to.deep.equal(data2);
+            expect(r4).to.deep.equal(data2);
+        });
+    });
+
+    // ── Retry-After header ──────────────────────────────────────
+
+    describe("Retry-After header", function () {
+        it("should respect Retry-After header in seconds", async function () {
+            this.timeout(10000);
+            nock(BASE).get("/namespaces").reply(429, {}, { "Retry-After": "1" });
+            nock(BASE).get("/namespaces").reply(200, [{ uri: "urn:ok" }]);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const start = Date.now();
+            const result = await client.getNamespaces();
+            const elapsed = Date.now() - start;
+            expect(result).to.deep.equal([{ uri: "urn:ok" }]);
+            expect(elapsed).to.be.at.least(900);
+        });
+
+        it("should fall back to exponential backoff without Retry-After", async function () {
+            this.timeout(10000);
+            nock(BASE).get("/namespaces").reply(503);
+            nock(BASE).get("/namespaces").reply(200, []);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const start = Date.now();
+            const result = await client.getNamespaces();
+            const elapsed = Date.now() - start;
+            expect(result).to.deep.equal([]);
+            expect(elapsed).to.be.at.least(900);
+        });
+    });
+
+    // ── Input sanitization ──────────────────────────────────────
+
+    describe("input sanitization", function () {
+        it("should reject null payload in writeValue", async function () {
+            client = new I3XClient({ baseUrl: BASE });
+            try {
+                await client.writeValue("obj1", null);
+                expect.fail("should have thrown");
+            } catch (err) {
+                expect(err.message).to.include("must not be null");
+            }
+        });
+
+        it("should reject undefined payload in writeHistory", async function () {
+            client = new I3XClient({ baseUrl: BASE });
+            try {
+                await client.writeHistory("obj1", undefined);
+                expect.fail("should have thrown");
+            } catch (err) {
+                expect(err.message).to.include("must not be null");
+            }
+        });
+
+        it("should reject disallowed fields in object payload", async function () {
+            client = new I3XClient({ baseUrl: BASE });
+            try {
+                await client.writeValue("obj1", { value: 1, malicious: "data" });
+                expect.fail("should have thrown");
+            } catch (err) {
+                expect(err.message).to.include("Disallowed fields");
+                expect(err.message).to.include("malicious");
+            }
+        });
+
+        it("should allow valid fields in object payload", async function () {
+            nock(BASE)
+                .put("/objects/obj1/value", { value: 42, timestamp: "2025-01-01T00:00:00Z", quality: "Good" })
+                .reply(200, { status: "ok" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.writeValue("obj1", {
+                value: 42,
+                timestamp: "2025-01-01T00:00:00Z",
+                quality: "Good",
+            });
+            expect(result).to.deep.equal({ status: "ok" });
+        });
+
+        it("should allow primitive payloads (numbers, strings)", async function () {
+            nock(BASE)
+                .put("/objects/obj1/value", (body) => body === 42)
+                .reply(200, { status: "ok" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.writeValue("obj1", 42);
+            expect(result).to.deep.equal({ status: "ok" });
+        });
+
+        it("should allow array payloads", async function () {
+            const payload = [{ value: 1, timestamp: "2025-01-01T00:00:00Z" }];
+            nock(BASE)
+                .put("/objects/obj1/history", payload)
+                .reply(200, { status: "ok" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.writeHistory("obj1", payload);
+            expect(result).to.deep.equal({ status: "ok" });
+        });
+    });
+
+    // ── Rate limiting ───────────────────────────────────────────
+
+    describe("rate limiting", function () {
+        it("should have a rate limiter instance", function () {
+            client = new I3XClient({ baseUrl: BASE });
+            expect(client._rateLimiter).to.exist;
+        });
     });
 });

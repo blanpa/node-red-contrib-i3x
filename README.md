@@ -90,9 +90,25 @@ Subscribe to value changes via SSE streaming or polling.
 - **Fallback:** If SSE fails, the node automatically falls back to polling
 - **Lifecycle:** Subscriptions are created on deploy and deleted on stop/re-deploy
 
+## Built-in Resilience & Best Practices
+
+The shared HTTP client (`lib/i3x-client.js`) implements all [i3X Client Developer Best Practices](https://www.i3x.dev/sdk/category/client-developers):
+
+| Feature | Description |
+| ------- | ----------- |
+| **Retry with Exponential Backoff** | Automatic retries on 429, 502, 503, 504 with exponential delay |
+| **Retry-After Header** | Respects server-provided `Retry-After` headers (seconds and HTTP-date formats) |
+| **TTL Caching** | Namespaces and object types are cached for 60 seconds to reduce API load |
+| **Rate Limiting** | Client-side sliding-window throttle (100 requests per 60-second window) |
+| **Input Sanitization** | Allowlist validation on write payloads to prevent injection of unexpected fields |
+| **TLS Certificate Validation** | `rejectUnauthorized: true` by default; overridable via TLS config node |
+| **SSE Reconnection** | Automatic reconnection with exponential backoff (up to 5 attempts, max 30s delay) |
+| **SSE → Polling Fallback** | Automatic fallback to polling if SSE stream setup fails |
+| **Subscription Cleanup** | Subscriptions are deleted server-side on node stop/re-deploy |
+
 ## API Endpoints Used
 
-This package targets the [i3X API Prototype v0.0.1](https://i3x.cesmii.net/docs):
+This package targets the [i3X API Prototype v0.0.1](https://api.i3x.dev/v0/docs):
 
 | Category  | Method | Endpoint                                     |
 | --------- | ------ | -------------------------------------------- |
@@ -208,7 +224,8 @@ node-red
 
 ## References
 
-- [i3X API Documentation](https://i3x.cesmii.net/docs)
+- [i3X API Documentation](https://api.i3x.dev/v0/docs)
+- [i3X Client Developer Guide](https://www.i3x.dev/sdk/category/client-developers)
 - [i3X Specification & RFC](https://github.com/cesmii/i3X)
 - [i3X SDK Documentation](https://www.i3x.dev/sdk)
 - [CESMII](https://www.cesmii.org)
