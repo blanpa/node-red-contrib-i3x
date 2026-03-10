@@ -3,7 +3,7 @@
  */
 "use strict";
 
-const { bindServer, parseIds, safeSend } = require("../lib/node-utils");
+const { bindServer, parseIds, safeSend, statusError, clampMaxDepth } = require("../lib/node-utils");
 
 /**
  * Resolve relative time strings like "-1h", "-7d", "-30m" to ISO 8601.
@@ -28,8 +28,7 @@ module.exports = function (RED) {
         node.elementIds = config.elementIds || "";
         node.startTime = config.startTime || "";
         node.endTime = config.endTime || "";
-        node.maxDepth = parseInt(config.maxDepth, 10);
-        if (isNaN(node.maxDepth)) node.maxDepth = 1;
+        node.maxDepth = clampMaxDepth(config.maxDepth);
 
         if (!bindServer(node, RED, config.server)) return;
 
@@ -46,18 +45,19 @@ module.exports = function (RED) {
 
             const startTime = resolveTime(msg.startTime || node.startTime);
             const endTime = resolveTime(msg.endTime || node.endTime);
-            const maxDepth = msg.maxDepth !== undefined ? parseInt(msg.maxDepth, 10) : node.maxDepth;
+            const maxDepth = msg.maxDepth !== undefined ? clampMaxDepth(msg.maxDepth) : node.maxDepth;
 
             node.status({ fill: "blue", shape: "dot", text: "querying..." });
 
             try {
                 const result = await client.readHistory(ids, { startTime, endTime, maxDepth });
                 msg.payload = result;
-                node.status({ fill: "green", shape: "dot", text: "ok" });
+                const count = Array.isArray(result) ? result.length : 1;
+                node.status({ fill: "green", shape: "dot", text: count + " record" + (count !== 1 ? "s" : "") });
                 send(msg);
                 if (done) done();
             } catch (err) {
-                node.status({ fill: "red", shape: "ring", text: err.message.substring(0, 32) });
+                node.status({ fill: "red", shape: "ring", text: statusError(err.message) });
                 if (done) done(err); else node.error(err, msg);
             }
         });

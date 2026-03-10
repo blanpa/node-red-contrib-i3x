@@ -44,6 +44,13 @@
         <label for="node-config-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
         <input type="number" id="node-config-input-timeout" placeholder="10000" min="1000" step="1000">
     </div>
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <button type="button" id="i3x-test-connection" class="red-ui-button" style="width:calc(100% - 110px)">
+            <i class="fa fa-plug"></i> Test Connection
+        </button>
+        <span id="i3x-test-result" style="margin-left:8px;font-size:12px"></span>
+    </div>
 </script>
 
 <script type="text/html" data-help-name="i3x-server">
@@ -93,6 +100,925 @@
             }
             authType.on("change", toggleAuth);
             toggleAuth();
+
+            var nodeId = this.id;
+            $("#i3x-test-connection").on("click", function () {
+                var $btn = $(this);
+                var $result = $("#i3x-test-result");
+                if (!nodeId) {
+                    $result.html('<span style="color:#d4a017"><i class="fa fa-warning"></i> Save and deploy first</span>');
+                    return;
+                }
+                $btn.prop("disabled", true);
+                $result.html('<i class="fa fa-spinner fa-spin"></i> Testing...');
+                $.getJSON("i3x-server/" + encodeURIComponent(nodeId) + "/status")
+                    .done(function (data) {
+                        if (data.connected) {
+                            $result.html('<span style="color:#22c55e"><i class="fa fa-check"></i> Connected</span>');
+                        } else {
+                            $result.html('<span style="color:#ef4444"><i class="fa fa-times"></i> Disconnected</span>');
+                        }
+                    })
+                    .fail(function () {
+                        $result.html('<span style="color:#ef4444"><i class="fa fa-times"></i> Not deployed</span>');
+                    })
+                    .always(function () {
+                        $btn.prop("disabled", false);
+                    });
+            });
         },
     });
+
+    /* ── Shared i3X Browser Widget ──────────────────────────────────── */
+    (function () {
+        "use strict";
+        var CSS_INJECTED = false;
+
+        /* ── 8. Dark Mode: CSS custom properties ───────────────────────── */
+        var CSS_VARS = [
+            ":root{",
+            "  --i3x-accent:#4CAF79;",
+            "  --i3x-accent-light:rgba(76,175,121,0.08);",
+            "  --i3x-accent-med:rgba(76,175,121,0.18);",
+            "  --i3x-bg:#fff;",
+            "  --i3x-bg-alt:#fafbfc;",
+            "  --i3x-bg-grad-start:#fafbfc;",
+            "  --i3x-bg-grad-end:#f3f4f6;",
+            "  --i3x-bg-hover:#f3f4f6;",
+            "  --i3x-border:#d0d7de;",
+            "  --i3x-border-light:#e1e4e8;",
+            "  --i3x-text:#24292f;",
+            "  --i3x-text-sec:#57606a;",
+            "  --i3x-text-muted:#8b949e;",
+            "  --i3x-text-input:#a0a8b4;",
+            "  --i3x-chk-off:#c9d1d9;",
+            "  --i3x-danger:#dc2626;",
+            "  --i3x-warn:#d4a017;",
+            "  --i3x-badge-zero-bg:#d0d7de;",
+            "  --i3x-badge-zero-fg:#57606a;",
+            "  --i3x-scrollbar:#d0d7de;",
+            "}",
+            /* Node-RED uses .red-ui-editor.dark for dark mode */
+            ".red-ui-editor.dark{",
+            "  --i3x-bg:#1e1e1e;",
+            "  --i3x-bg-alt:#252526;",
+            "  --i3x-bg-grad-start:#252526;",
+            "  --i3x-bg-grad-end:#2d2d2d;",
+            "  --i3x-bg-hover:#2a2d2e;",
+            "  --i3x-border:#444;",
+            "  --i3x-border-light:#3c3c3c;",
+            "  --i3x-text:#cccccc;",
+            "  --i3x-text-sec:#aaa;",
+            "  --i3x-text-muted:#888;",
+            "  --i3x-text-input:#777;",
+            "  --i3x-chk-off:#555;",
+            "  --i3x-danger:#f87171;",
+            "  --i3x-warn:#fbbf24;",
+            "  --i3x-badge-zero-bg:#444;",
+            "  --i3x-badge-zero-fg:#aaa;",
+            "  --i3x-scrollbar:#555;",
+            "}"
+        ].join("\n");
+
+        /* ── 7. Type-icon mapping ──────────────────────────────────────── */
+        var TYPE_ICON_MAP = {
+            "sensor":      "fa-thermometer-half",
+            "temperature": "fa-thermometer-half",
+            "pressure":    "fa-tachometer",
+            "humidity":    "fa-tint",
+            "flow":        "fa-exchange",
+            "level":       "fa-signal",
+            "valve":       "fa-cog",
+            "pump":        "fa-cog",
+            "motor":       "fa-cog",
+            "actuator":    "fa-cog",
+            "equipment":   "fa-wrench",
+            "machine":     "fa-industry",
+            "tank":        "fa-database",
+            "vessel":      "fa-database",
+            "pipe":        "fa-minus",
+            "line":        "fa-minus",
+            "area":        "fa-map-marker",
+            "site":        "fa-building",
+            "plant":       "fa-building",
+            "enterprise":  "fa-globe",
+            "alarm":       "fa-bell",
+            "event":       "fa-bolt",
+            "setpoint":    "fa-sliders",
+            "parameter":   "fa-sliders",
+            "controller":  "fa-microchip",
+            "plc":         "fa-microchip",
+            "default":     "fa-cube"
+        };
+
+        function guessIcon(typeName) {
+            if (!typeName) return TYPE_ICON_MAP["default"];
+            var lower = typeName.toLowerCase();
+            var keys = Object.keys(TYPE_ICON_MAP);
+            for (var i = 0; i < keys.length; i++) {
+                if (lower.indexOf(keys[i]) !== -1) return TYPE_ICON_MAP[keys[i]];
+            }
+            return TYPE_ICON_MAP["default"];
+        }
+
+        function injectCSS() {
+            if (CSS_INJECTED) return;
+            CSS_INJECTED = true;
+            var s = document.createElement("style");
+            s.textContent = CSS_VARS + "\n" + [
+                /* panel */
+                ".i3x-browser{border:1px solid var(--i3x-border);border-radius:8px;margin-top:8px;background:var(--i3x-bg);box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden;transition:all .2s ease;position:relative}",
+                /* header */
+                ".i3x-browser-hdr{padding:8px 10px;background:linear-gradient(to bottom,var(--i3x-bg-grad-start),var(--i3x-bg-grad-end));border-bottom:1px solid var(--i3x-border-light);display:flex;gap:6px;align-items:center}",
+                ".i3x-browser-search-wrap{flex:1;position:relative}",
+                ".i3x-browser-search-wrap .fa-search{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--i3x-text-input);font-size:11px;pointer-events:none}",
+                ".i3x-browser-search{width:100%;padding:5px 24px 5px 26px;border:1px solid var(--i3x-border);border-radius:6px;font-size:12px;outline:none;background:var(--i3x-bg);color:var(--i3x-text);transition:border-color .15s,box-shadow .15s;box-sizing:border-box}",
+                ".i3x-browser-search:focus{border-color:var(--i3x-accent);box-shadow:0 0 0 3px var(--i3x-accent-light)}",
+                ".i3x-search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--i3x-text-input);font-size:12px;cursor:pointer;padding:0 2px;display:none;line-height:1}",
+                ".i3x-search-clear:hover{color:var(--i3x-text-sec)}",
+                ".i3x-hdr-btn{border:1px solid var(--i3x-border);background:var(--i3x-bg);border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--i3x-text-sec);transition:all .15s;flex-shrink:0}",
+                ".i3x-hdr-btn:hover{background:var(--i3x-bg-hover);border-color:var(--i3x-border);color:var(--i3x-text)}",
+                /* 6. connection status dot */
+                ".i3x-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}",
+                ".i3x-status-dot.connected{background:#22c55e;box-shadow:0 0 4px rgba(34,197,94,.5)}",
+                ".i3x-status-dot.disconnected{background:#ef4444;box-shadow:0 0 4px rgba(239,68,68,.5)}",
+                ".i3x-status-dot.unknown{background:#a0a8b4}",
+                /* 8. breadcrumb */
+                ".i3x-breadcrumb{padding:4px 10px;border-bottom:1px solid var(--i3x-border-light);background:var(--i3x-bg-alt);font-size:11px;color:var(--i3x-text-muted);display:none;align-items:center;gap:4px;overflow-x:auto;white-space:nowrap}",
+                ".i3x-breadcrumb .i3x-bc-item{cursor:pointer;color:var(--i3x-accent);text-decoration:none}",
+                ".i3x-breadcrumb .i3x-bc-item:hover{text-decoration:underline}",
+                ".i3x-breadcrumb .i3x-bc-sep{color:var(--i3x-text-muted);margin:0 2px}",
+                ".i3x-breadcrumb .i3x-bc-current{color:var(--i3x-text)}",
+                /* search results container */
+                ".i3x-search-results{padding:4px 0}",
+                ".i3x-search-results .i3x-sr-type{color:var(--i3x-text-muted);font-size:10px;margin-left:auto;flex-shrink:0}",
+                /* tree */
+                ".i3x-browser-tree{max-height:320px;overflow-y:auto;padding:4px 0;scrollbar-width:thin;scrollbar-color:var(--i3x-scrollbar) transparent}",
+                ".i3x-browser-tree::-webkit-scrollbar{width:6px}",
+                ".i3x-browser-tree::-webkit-scrollbar-thumb{background:var(--i3x-scrollbar);border-radius:3px}",
+                /* messages */
+                ".i3x-browser-msg{padding:20px 16px;text-align:center;color:var(--i3x-text-muted);font-size:12px;line-height:1.5}",
+                ".i3x-browser-msg .fa{margin-right:4px}",
+                ".i3x-browser-msg.i3x-msg-inline{padding:4px 0;text-align:left;font-size:11px}",
+                /* nodes */
+                ".i3x-bnode{user-select:none}",
+                /* rows */
+                ".i3x-bnode-row{padding:4px 10px 4px 0;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;border-radius:4px;margin:1px 4px;transition:background .12s;outline:none}",
+                ".i3x-bnode-row:hover{background:var(--i3x-bg-hover)}",
+                ".i3x-bnode-row.sel{background:var(--i3x-accent-med)}",
+                ".i3x-bnode-row.sel:hover{background:var(--i3x-accent-med)}",
+                /* 10. keyboard focus ring */
+                ".i3x-bnode-row.i3x-kb-focus{outline:2px solid var(--i3x-accent);outline-offset:-2px}",
+                /* toggle arrow */
+                ".i3x-bnode-toggle{width:16px;text-align:center;flex-shrink:0;color:var(--i3x-text-muted);font-size:10px;transition:transform .15s ease}",
+                /* type icon */
+                ".i3x-bnode-icon{flex-shrink:0;font-size:12px;width:16px;text-align:center}",
+                ".i3x-bnode-row[data-eid] .i3x-bnode-icon{color:var(--i3x-accent)}",
+                ".i3x-bnode-row:not([data-eid]) .i3x-bnode-icon{color:var(--i3x-text-muted)}",
+                /* checkbox */
+                ".i3x-bnode-chk{flex-shrink:0;font-size:13px;color:var(--i3x-chk-off);transition:color .12s}",
+                ".i3x-bnode-row.sel .i3x-bnode-chk{color:var(--i3x-accent)}",
+                /* name & id */
+                ".i3x-bnode-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--i3x-text);font-size:12px}",
+                ".i3x-bnode-row:not([data-eid]) .i3x-bnode-name{font-weight:600;color:var(--i3x-text-sec);font-size:11px;text-transform:uppercase;letter-spacing:0.3px}",
+                ".i3x-bnode-id{color:var(--i3x-text-muted);font-size:10px;flex-shrink:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:SFMono-Regular,Consolas,monospace}",
+                /* type count badge */
+                ".i3x-bnode-count{color:var(--i3x-text-muted);font-size:10px;flex-shrink:0;font-weight:400;text-transform:none;letter-spacing:0}",
+                /* children container */
+                ".i3x-bnode-children{display:none;border-left:1px solid var(--i3x-border-light);margin-left:18px}",
+                ".i3x-bnode-children.open{display:block}",
+                /* footer */
+                ".i3x-browser-foot{padding:6px 12px;border-top:1px solid var(--i3x-border-light);background:var(--i3x-bg-alt);font-size:11px;color:var(--i3x-text-sec);display:flex;justify-content:space-between;align-items:center;gap:6px}",
+                ".i3x-foot-badge{display:inline-flex;align-items:center;gap:4px}",
+                ".i3x-foot-count{background:var(--i3x-accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;min-width:14px;text-align:center}",
+                ".i3x-foot-count.zero{background:var(--i3x-badge-zero-bg);color:var(--i3x-badge-zero-fg)}",
+                ".i3x-clear-btn{border:none;background:none;color:var(--i3x-text-muted);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;transition:all .12s}",
+                ".i3x-clear-btn:hover{background:#fee2e2;color:var(--i3x-danger)}",
+                /* 11. export button */
+                ".i3x-export-btn{border:1px solid var(--i3x-border);background:var(--i3x-bg);color:var(--i3x-text-sec);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;transition:all .12s;display:inline-flex;align-items:center;gap:3px}",
+                ".i3x-export-btn:hover{border-color:var(--i3x-accent);color:var(--i3x-accent)}",
+                ".i3x-export-btn.copied{background:var(--i3x-accent);color:#fff;border-color:var(--i3x-accent)}",
+                /* browse button */
+                ".i3x-browse-btn{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border:1px solid var(--i3x-border);border-radius:6px;background:linear-gradient(to bottom,var(--i3x-bg),var(--i3x-bg-alt));color:var(--i3x-text);font-size:12px;cursor:pointer;transition:all .15s;font-family:inherit;margin-left:4px}",
+                ".i3x-browse-btn:hover{background:linear-gradient(to bottom,var(--i3x-bg-hover),var(--i3x-bg-grad-end));border-color:var(--i3x-border)}",
+                ".i3x-browse-btn.active{border-color:var(--i3x-accent);color:var(--i3x-accent);box-shadow:0 0 0 3px var(--i3x-accent-light)}",
+                ".i3x-browse-btn .fa{font-size:11px}",
+                ".i3x-btn-badge{background:var(--i3x-accent);color:#fff;font-size:9px;font-weight:700;padding:0 5px;border-radius:8px;min-width:12px;text-align:center;line-height:16px}",
+                /* 9. resize handle */
+                ".i3x-resize-handle{height:6px;cursor:ns-resize;background:transparent;border-top:1px solid var(--i3x-border-light);display:flex;align-items:center;justify-content:center}",
+                ".i3x-resize-handle::after{content:'';width:30px;height:3px;border-top:1px solid var(--i3x-border);border-bottom:1px solid var(--i3x-border)}",
+                ".i3x-resize-handle:hover::after{border-color:var(--i3x-accent)}",
+                /* live value badge */
+                ".i3x-bnode-value{font-size:10px;flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:SFMono-Regular,Consolas,monospace;padding:1px 5px;border-radius:3px;background:var(--i3x-bg-alt);border:1px solid var(--i3x-border-light);color:var(--i3x-text-sec);cursor:default;transition:all .2s}",
+                ".i3x-bnode-value:hover{max-width:300px}",
+                ".i3x-bnode-value.i3x-val-loading{color:var(--i3x-text-muted);border-style:dashed;font-style:italic}",
+                ".i3x-bnode-value.i3x-val-error{color:var(--i3x-danger);border-color:var(--i3x-danger);background:rgba(220,38,38,0.05)}",
+                /* spinner */
+                "@keyframes i3x-spin{to{transform:rotate(360deg)}}",
+                ".i3x-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--i3x-border-light);border-top-color:var(--i3x-accent);border-radius:50%;animation:i3x-spin .6s linear infinite;vertical-align:middle;margin-right:6px}"
+            ].join("\n");
+            document.head.appendChild(s);
+        }
+
+        function esc(t) { return $("<span>").text(t).html(); }
+        function spinner() { return '<span class="i3x-spinner"></span>'; }
+
+        /**
+         * I3XBrowser.create(options)
+         *   container   – CSS selector, where to render the widget
+         *   serverField – selector for the server config dropdown
+         *   targetField – selector for the element-ID input
+         *   mode        – "single" | "multi"
+         */
+        window.I3XBrowser = {
+            create: function (opts) {
+                injectCSS();
+
+                var $target = $(opts.targetField);
+                var $server = $(opts.serverField);
+                var mode = opts.mode || "multi";
+                var selected = {}; // elementId -> displayName
+                var rendered = {}; // tracks rendered nodes to prevent cycles
+                var MAX_DEPTH = 8;
+                var collapsed = true;
+                var typesLoaded = false;
+                var searchMode = false; // true when showing server search results
+                var searchTimer = null;
+                var breadcrumbPath = []; // [{name, eid}]
+                var chkOn = mode === "multi" ? "fa-check-square" : "fa-dot-circle-o";
+                var chkOff = mode === "multi" ? "fa-square-o" : "fa-circle-o";
+
+                // parse initial value
+                var init = ($target.val() || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+                init.forEach(function (id) { selected[id] = id; });
+
+                // DOM
+                var $wrap = $(opts.container);
+                var $btnBadge = $('<span class="i3x-btn-badge" style="display:none"></span>');
+                var $btn = $('<button class="i3x-browse-btn" type="button"><i class="fa fa-sitemap"></i> Browse Server</button>');
+                $btn.append($btnBadge);
+                var $panel = $('<div class="i3x-browser" style="display:none"></div>');
+
+                // Header
+                var $hdr = $('<div class="i3x-browser-hdr"></div>');
+                /* 6. Connection status indicator */
+                var $statusDot = $('<span class="i3x-status-dot unknown" title="Checking connection..."></span>');
+                var $searchWrap = $('<div class="i3x-browser-search-wrap"><i class="fa fa-search"></i></div>');
+                var $search = $('<input class="i3x-browser-search" placeholder="Search objects... (server-side for 2+ chars)" type="text">');
+                var $searchClear = $('<button class="i3x-search-clear" type="button" title="Clear search"><i class="fa fa-times"></i></button>');
+                $searchWrap.append($search, $searchClear);
+                var $expandAll = $('<button class="i3x-hdr-btn" type="button" title="Expand all"><i class="fa fa-expand"></i></button>');
+                var $collapseAll = $('<button class="i3x-hdr-btn" type="button" title="Collapse all"><i class="fa fa-compress"></i></button>');
+                var $refresh = $('<button class="i3x-hdr-btn" type="button" title="Refresh"><i class="fa fa-refresh"></i></button>');
+                $hdr.append($statusDot, $searchWrap, $expandAll, $collapseAll, $refresh);
+
+                /* 8. Breadcrumb bar */
+                var $breadcrumb = $('<div class="i3x-breadcrumb"></div>');
+
+                var $tree = $('<div class="i3x-browser-tree" tabindex="0"></div>');
+
+                /* Footer with export */
+                var $foot = $('<div class="i3x-browser-foot">' +
+                    '<span class="i3x-foot-badge"><span class="i3x-foot-count zero">0</span> <span class="i3x-foot-label">selected</span></span>' +
+                    '<span style="display:flex;align-items:center;gap:6px">' +
+                    '<button class="i3x-export-btn" type="button" title="Copy selected IDs as JSON"><i class="fa fa-clipboard"></i> Export</button>' +
+                    '<button class="i3x-clear-btn" type="button">Clear all</button></span></div>');
+
+                /* 9. Resize handle */
+                var $resizeHandle = $('<div class="i3x-resize-handle" title="Drag to resize"></div>');
+
+                $panel.append($hdr, $breadcrumb, $tree, $resizeHandle, $foot);
+                $wrap.append($btn, $panel);
+
+                // ── Toggle panel ──
+                $btn.on("click", function () {
+                    collapsed = !collapsed;
+                    $panel.toggle(!collapsed);
+                    $btn.toggleClass("active", !collapsed);
+                    if (!collapsed && !typesLoaded) loadTypes();
+                    if (!collapsed) {
+                        $search.focus();
+                        checkConnectionStatus();
+                    }
+                });
+
+                function sid() { return $server.val(); }
+
+                function syncTarget() {
+                    var ids = Object.keys(selected);
+                    $target.val(ids.join(", "));
+                    var n = ids.length;
+                    $foot.find(".i3x-foot-count").text(n).toggleClass("zero", n === 0);
+                    if (n > 0) {
+                        $btnBadge.text(n).show();
+                    } else {
+                        $btnBadge.hide();
+                    }
+                }
+
+                // ── Live value fetching ──
+                function formatValue(val) {
+                    if (val === null || val === undefined) return "null";
+                    if (typeof val === "object") {
+                        // Extract .value if it's a VQT structure
+                        if (val.value !== undefined) return formatValue(val.value);
+                        return JSON.stringify(val).substring(0, 40);
+                    }
+                    if (typeof val === "number") {
+                        // Round floats for readability
+                        return Number.isInteger(val) ? String(val) : val.toFixed(3);
+                    }
+                    if (typeof val === "boolean") return val ? "true" : "false";
+                    return String(val).substring(0, 40);
+                }
+
+                function fetchLiveValues(elementIds) {
+                    if (!elementIds.length || !sid()) return;
+                    $.ajax({
+                        url: "i3x-server/" + encodeURIComponent(sid()) + "/browse/values",
+                        method: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify({ elementIds: elementIds }),
+                    })
+                    .done(function (results) {
+                        // API returns either:
+                        //   { "eid": { data: [{value, quality, timestamp}] } }  (object keyed by elementId)
+                        //   or [{elementId, value, ...}]  (array)
+                        var valMap = {};
+                        if (Array.isArray(results)) {
+                            results.forEach(function (item) {
+                                var eid = item.elementId || item.id;
+                                if (eid) valMap[eid] = item;
+                            });
+                        } else if (results && typeof results === "object") {
+                            Object.keys(results).forEach(function (eid) {
+                                var entry = results[eid];
+                                // Unwrap { data: [...] } structure
+                                if (entry && Array.isArray(entry.data) && entry.data.length > 0) {
+                                    valMap[eid] = entry.data[0]; // latest value
+                                } else if (entry && entry.value !== undefined) {
+                                    valMap[eid] = entry;
+                                }
+                            });
+                        }
+                        elementIds.forEach(function (eid) {
+                            var $val = $tree.find('[data-val-eid="' + eid.replace(/"/g, '\\"') + '"]');
+                            if (!$val.length) return;
+                            var item = valMap[eid];
+                            if (item && item.value !== undefined) {
+                                var display = formatValue(item.value);
+                                var parts = [display];
+                                if (item.quality) parts.push("Q: " + item.quality);
+                                if (item.timestamp) parts.push(new Date(item.timestamp).toLocaleString());
+                                $val.removeClass("i3x-val-loading i3x-val-error")
+                                    .text(display)
+                                    .attr("title", parts.join(" | "));
+                            } else {
+                                $val.removeClass("i3x-val-loading").text("–").attr("title", "No value");
+                            }
+                        });
+                    })
+                    .fail(function () {
+                        elementIds.forEach(function (eid) {
+                            var $val = $tree.find('[data-val-eid="' + eid.replace(/"/g, '\\"') + '"]');
+                            $val.removeClass("i3x-val-loading").addClass("i3x-val-error").text("–");
+                        });
+                    });
+                }
+
+                // ── 6. Connection status check ──
+                function checkConnectionStatus() {
+                    var s = sid();
+                    if (!s) {
+                        $statusDot.attr("class", "i3x-status-dot unknown").attr("title", "No server selected");
+                        return;
+                    }
+                    $.getJSON("i3x-server/" + encodeURIComponent(s) + "/status")
+                        .done(function (data) {
+                            if (data.connected) {
+                                $statusDot.attr("class", "i3x-status-dot connected").attr("title", "Connected");
+                            } else {
+                                $statusDot.attr("class", "i3x-status-dot disconnected").attr("title", "Disconnected");
+                            }
+                        })
+                        .fail(function () {
+                            $statusDot.attr("class", "i3x-status-dot disconnected").attr("title", "Server not deployed");
+                        });
+                }
+
+                // ── 8. Breadcrumb management ──
+                function updateBreadcrumb(path) {
+                    breadcrumbPath = path || [];
+                    if (!breadcrumbPath.length) {
+                        $breadcrumb.hide();
+                        return;
+                    }
+                    $breadcrumb.empty().css("display", "flex");
+                    var $root = $('<span class="i3x-bc-item">Root</span>');
+                    $root.on("click", function () {
+                        updateBreadcrumb([]);
+                        if (typesLoaded) {
+                            // re-show the type tree at root level
+                            $tree.children(".i3x-bnode").show();
+                            $tree.find(".i3x-bnode-children").removeClass("open");
+                            $tree.find(".i3x-bnode-toggle .fa").removeClass("fa-caret-down").addClass("fa-caret-right");
+                        }
+                    });
+                    $breadcrumb.append($root);
+                    breadcrumbPath.forEach(function (item, idx) {
+                        $breadcrumb.append('<span class="i3x-bc-sep"><i class="fa fa-angle-right"></i></span>');
+                        if (idx < breadcrumbPath.length - 1) {
+                            var $link = $('<span class="i3x-bc-item"></span>').text(item.name);
+                            $link.on("click", function () {
+                                updateBreadcrumb(breadcrumbPath.slice(0, idx + 1));
+                            });
+                            $breadcrumb.append($link);
+                        } else {
+                            $breadcrumb.append($('<span class="i3x-bc-current"></span>').text(item.name));
+                        }
+                    });
+                }
+
+                // ── Cascade select/deselect on all loaded children ──
+                function setNodeSelected($row, eid, name, doSelect) {
+                    var $chk = $row.find("." + chkOn + ",." + chkOff);
+                    if (doSelect) {
+                        selected[eid] = name;
+                        $row.addClass("sel");
+                        $chk.removeClass(chkOff).addClass(chkOn);
+                    } else {
+                        delete selected[eid];
+                        $row.removeClass("sel");
+                        $chk.removeClass(chkOn).addClass(chkOff);
+                    }
+                }
+
+                function cascadeSelect($parentNode, doSelect) {
+                    $parentNode.find("> .i3x-bnode-children .i3x-bnode-row[data-eid]").each(function () {
+                        var $childRow = $(this);
+                        var ceid = $childRow.attr("data-eid");
+                        var cname = $childRow.find(".i3x-bnode-name").text();
+                        setNodeSelected($childRow, ceid, cname, doSelect);
+                    });
+                }
+
+                // ── Build a tree node ──
+                function makeNode(eid, name, depth, icon, typeName) {
+                    var pad = 10 + depth * 20;
+                    var isSel = !!selected[eid];
+                    /* 7. pick icon by type name */
+                    var nodeIcon = icon || guessIcon(typeName);
+                    var $node = $('<div class="i3x-bnode"></div>');
+                    var $row = $('<div class="i3x-bnode-row' + (isSel ? " sel" : "") + '" data-eid="' + esc(eid) + '" style="padding-left:' + pad + 'px" title="' + esc(eid) + '">' +
+                        '<span class="i3x-bnode-toggle"><i class="fa fa-caret-right"></i></span>' +
+                        '<i class="fa ' + nodeIcon + ' i3x-bnode-icon"></i>' +
+                        '<i class="fa ' + (isSel ? chkOn : chkOff) + ' i3x-bnode-chk"></i>' +
+                        '<span class="i3x-bnode-name">' + esc(name) + '</span>' +
+                        '<span class="i3x-bnode-value i3x-val-loading" data-val-eid="' + esc(eid) + '"></span>' +
+                        '<span class="i3x-bnode-id">' + esc(eid) + '</span></div>');
+                    var $children = $('<div class="i3x-bnode-children"></div>');
+                    var childrenLoaded = false;
+                    $node.append($row, $children);
+
+                    // expand/collapse toggle + breadcrumb update
+                    $row.find(".i3x-bnode-toggle").on("click", function (e) {
+                        e.stopPropagation();
+                        var isOpen = $children.hasClass("open");
+                        $children.toggleClass("open", !isOpen);
+                        $(this).find(".fa").toggleClass("fa-caret-right", isOpen).toggleClass("fa-caret-down", !isOpen);
+                        if (!isOpen && !childrenLoaded) {
+                            childrenLoaded = true;
+                            loadChildren(eid, $children, depth + 1, typeName);
+                        }
+                        // update breadcrumb
+                        if (!isOpen) {
+                            var path = [];
+                            var $cur = $row;
+                            while ($cur.length) {
+                                var curEid = $cur.attr("data-eid");
+                                var curName = $cur.find(".i3x-bnode-name").first().text();
+                                if (curEid) {
+                                    path.unshift({ name: curName, eid: curEid });
+                                }
+                                $cur = $cur.closest(".i3x-bnode").parent().closest(".i3x-bnode").children(".i3x-bnode-row");
+                            }
+                            updateBreadcrumb(path);
+                        }
+                    });
+
+                    // select/deselect
+                    $row.on("click", function (e) {
+                        if ($(e.target).closest(".i3x-bnode-toggle").length) return;
+                        var willSelect = !selected[eid];
+                        if (mode === "single") {
+                            selected = {};
+                            $tree.find(".i3x-bnode-row").removeClass("sel")
+                                .find("." + chkOn).removeClass(chkOn).addClass(chkOff);
+                        }
+                        setNodeSelected($row, eid, name, willSelect);
+                        if (mode === "multi") {
+                            cascadeSelect($node, willSelect);
+                        }
+                        syncTarget();
+                    });
+
+                    return $node;
+                }
+
+                function isParentSelected(parentEid) {
+                    return !!selected[parentEid];
+                }
+
+                // ── Load children (related objects) ──
+                function loadChildren(parentEid, $container, depth, parentTypeName) {
+                    var pad = 10 + depth * 20;
+                    if (depth > MAX_DEPTH) {
+                        $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:' + pad + 'px;color:var(--i3x-warn)">Max depth reached</div>');
+                        return;
+                    }
+                    $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:' + pad + 'px">' + spinner() + 'Loading...</div>');
+                    $.getJSON("i3x-server/" + encodeURIComponent(sid()) + "/browse/related/" + encodeURIComponent(parentEid))
+                        .done(function (items) {
+                            $container.empty();
+                            items = Array.isArray(items) ? items : [];
+                            items = items.filter(function (obj) {
+                                var eid = obj.elementId || obj.id;
+                                return eid !== parentEid && !rendered[eid];
+                            });
+                            if (!items.length) {
+                                $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:' + pad + 'px">No children</div>');
+                                return;
+                            }
+                            var parentSel = mode === "multi" && isParentSelected(parentEid);
+                            items.sort(function (a, b) { return (a.displayName || "").localeCompare(b.displayName || ""); });
+                            var eids = [];
+                            items.forEach(function (obj) {
+                                var eid = obj.elementId || obj.id;
+                                var name = obj.displayName || eid;
+                                var tName = obj.typeName || parentTypeName || "";
+                                rendered[eid] = true;
+                                eids.push(eid);
+                                if (parentSel) { selected[eid] = name; }
+                                $container.append(makeNode(eid, name, depth, null, tName));
+                            });
+                            if (eids.length) fetchLiveValues(eids);
+                            if (parentSel) { syncTarget(); }
+                        })
+                        .fail(function () {
+                            $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:' + pad + 'px;color:var(--i3x-danger)"><i class="fa fa-exclamation-circle"></i> Failed to load</div>');
+                        });
+                }
+
+                // ── Load top-level: object types ──
+                function loadTypes() {
+                    var s = sid();
+                    if (!s) {
+                        $tree.html('<div class="i3x-browser-msg"><i class="fa fa-info-circle"></i><br>Select and deploy a server configuration first</div>');
+                        return;
+                    }
+                    $tree.html('<div class="i3x-browser-msg">' + spinner() + 'Connecting to server...</div>');
+                    $.getJSON("i3x-server/" + encodeURIComponent(s) + "/browse/objecttypes")
+                        .done(function (types) {
+                            typesLoaded = true;
+                            searchMode = false;
+                            renderTypes(Array.isArray(types) ? types : []);
+                            checkConnectionStatus();
+                        })
+                        .fail(function (xhr) {
+                            var msg = (xhr.responseJSON && xhr.responseJSON.error) || "Connection failed";
+                            $tree.html('<div class="i3x-browser-msg"><i class="fa fa-exclamation-triangle" style="color:var(--i3x-warn)"></i><br>' + esc(msg) + '</div>');
+                            checkConnectionStatus();
+                        });
+                }
+
+                function renderTypes(types) {
+                    $tree.empty();
+                    updateBreadcrumb([]);
+                    if (!types.length) {
+                        $tree.html('<div class="i3x-browser-msg">No object types found on this server</div>');
+                        return;
+                    }
+                    types.sort(function (a, b) { return (a.displayName || "").localeCompare(b.displayName || ""); });
+                    types.forEach(function (type) {
+                        var tid = type.elementId || type.id;
+                        var tname = type.displayName || tid;
+                        /* 7. pick icon for type category */
+                        var typeIcon = guessIcon(tname);
+                        var $typeNode = $('<div class="i3x-bnode"></div>');
+                        var $countSpan = $('<span class="i3x-bnode-count"></span>');
+                        var $trow = $('<div class="i3x-bnode-row" style="padding-left:10px">' +
+                            '<span class="i3x-bnode-toggle"><i class="fa fa-caret-right"></i></span>' +
+                            '<i class="fa ' + typeIcon + ' i3x-bnode-icon"></i>' +
+                            '<span class="i3x-bnode-name">' + esc(tname) + '</span></div>');
+                        $trow.append($countSpan);
+                        var $objs = $('<div class="i3x-bnode-children"></div>');
+                        var loaded = false;
+                        $typeNode.append($trow, $objs);
+
+                        $trow.on("click", function () {
+                            var isOpen = $objs.hasClass("open");
+                            $objs.toggleClass("open", !isOpen);
+                            $trow.find(".i3x-bnode-toggle .fa")
+                                .toggleClass("fa-caret-right", isOpen)
+                                .toggleClass("fa-caret-down", !isOpen);
+                            if (!isOpen && !loaded) {
+                                loaded = true;
+                                loadObjects(tid, tname, $objs, $countSpan);
+                            }
+                        });
+                        $tree.append($typeNode);
+                    });
+                }
+
+                // ── Load objects for a type ──
+                function loadObjects(typeId, typeName, $container, $countSpan) {
+                    $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:30px">' + spinner() + 'Loading...</div>');
+                    $.getJSON("i3x-server/" + encodeURIComponent(sid()) + "/browse/objects", { typeId: typeId })
+                        .done(function (objects) {
+                            $container.empty();
+                            objects = Array.isArray(objects) ? objects : [];
+                            if ($countSpan) $countSpan.text("(" + objects.length + ")");
+                            if (!objects.length) {
+                                $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:30px">No objects</div>');
+                                return;
+                            }
+                            objects.sort(function (a, b) { return (a.displayName || "").localeCompare(b.displayName || ""); });
+                            var eids = [];
+                            objects.forEach(function (obj) {
+                                var eid = obj.elementId || obj.id;
+                                var name = obj.displayName || eid;
+                                rendered[eid] = true;
+                                eids.push(eid);
+                                $container.append(makeNode(eid, name, 1, null, typeName));
+                            });
+                            if (eids.length) fetchLiveValues(eids);
+                        })
+                        .fail(function () {
+                            $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:30px;color:var(--i3x-danger)"><i class="fa fa-exclamation-circle"></i> Failed to load</div>');
+                        });
+                }
+
+                // ── 5. Server-side search with debounce ──
+                function serverSearch(q) {
+                    $tree.html('<div class="i3x-browser-msg">' + spinner() + 'Searching server...</div>');
+                    $.getJSON("i3x-server/" + encodeURIComponent(sid()) + "/browse/search", { q: q })
+                        .done(function (results) {
+                            searchMode = true;
+                            $tree.empty();
+                            updateBreadcrumb([{ name: "Search: " + q }]);
+                            results = Array.isArray(results) ? results : [];
+                            if (!results.length) {
+                                $tree.html('<div class="i3x-browser-msg"><i class="fa fa-search"></i><br>No results for "' + esc(q) + '"</div>');
+                                return;
+                            }
+                            var $container = $('<div class="i3x-search-results"></div>');
+                            var eids = [];
+                            results.forEach(function (obj) {
+                                var eid = obj.elementId || obj.id;
+                                var name = obj.displayName || eid;
+                                var tName = obj.typeName || "";
+                                eids.push(eid);
+                                var $node = makeNode(eid, name, 0, null, tName);
+                                // add type label
+                                if (tName) {
+                                    $node.find(".i3x-bnode-row").first().find(".i3x-bnode-id").before(
+                                        '<span class="i3x-sr-type">' + esc(tName) + '</span> '
+                                    );
+                                }
+                                $container.append($node);
+                            });
+                            $tree.append($container);
+                            if (eids.length) fetchLiveValues(eids);
+                        })
+                        .fail(function () {
+                            $tree.html('<div class="i3x-browser-msg" style="color:var(--i3x-danger)"><i class="fa fa-exclamation-circle"></i><br>Search failed</div>');
+                        });
+                }
+
+                // ── Search: local filter for loaded items + server-side for 2+ chars ──
+                $search.on("input", function () {
+                    var q = $search.val().trim();
+                    var qLower = q.toLowerCase();
+                    $searchClear.toggle(q.length > 0);
+
+                    if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
+
+                    if (!q) {
+                        // restore tree view
+                        if (searchMode) {
+                            searchMode = false;
+                            typesLoaded = false;
+                            rendered = {};
+                            loadTypes();
+                        } else {
+                            // just reset local filter
+                            $tree.find(".i3x-bnode").show();
+                            $tree.find(".i3x-bnode-row[data-eid]").each(function () {
+                                $(this).closest(".i3x-bnode").show();
+                            });
+                            $tree.children(".i3x-bnode").show();
+                        }
+                        updateBreadcrumb([]);
+                        return;
+                    }
+
+                    // immediate local filter on loaded items
+                    $tree.find(".i3x-bnode-row[data-eid]").each(function () {
+                        var $el = $(this);
+                        var vis = !qLower ||
+                            $el.find(".i3x-bnode-name").text().toLowerCase().indexOf(qLower) !== -1 ||
+                            $el.find(".i3x-bnode-id").text().toLowerCase().indexOf(qLower) !== -1;
+                        $el.closest(".i3x-bnode").toggle(vis);
+                    });
+                    $tree.children(".i3x-bnode").each(function () {
+                        var $tn = $(this);
+                        var $childContainer = $tn.children(".i3x-bnode-children");
+                        if (qLower) {
+                            $childContainer.addClass("open");
+                            $tn.find(".i3x-bnode-toggle .fa").removeClass("fa-caret-right").addClass("fa-caret-down");
+                            var anyVisible = $childContainer.find(".i3x-bnode:visible").length > 0;
+                            $tn.toggle(anyVisible);
+                        } else {
+                            $tn.show();
+                        }
+                    });
+
+                    // debounced server-side search for 2+ chars
+                    if (q.length >= 2) {
+                        searchTimer = setTimeout(function () {
+                            serverSearch(q);
+                        }, 400);
+                    }
+                });
+
+                $searchClear.on("click", function () {
+                    $search.val("").trigger("input").focus();
+                });
+
+                // expand all loaded nodes
+                $expandAll.on("click", function () {
+                    $tree.find(".i3x-bnode-children").addClass("open");
+                    $tree.find(".i3x-bnode-toggle .fa").removeClass("fa-caret-right").addClass("fa-caret-down");
+                });
+
+                // collapse all
+                $collapseAll.on("click", function () {
+                    $tree.find(".i3x-bnode-children").removeClass("open");
+                    $tree.find(".i3x-bnode-toggle .fa").removeClass("fa-caret-down").addClass("fa-caret-right");
+                    updateBreadcrumb([]);
+                });
+
+                $refresh.on("click", function () {
+                    typesLoaded = false;
+                    searchMode = false;
+                    rendered = {};
+                    $search.val("");
+                    $searchClear.hide();
+                    loadTypes();
+                });
+
+                $foot.find(".i3x-clear-btn").on("click", function (e) {
+                    e.preventDefault();
+                    selected = {};
+                    $tree.find(".i3x-bnode-row").removeClass("sel")
+                        .find("." + chkOn).removeClass(chkOn).addClass(chkOff);
+                    syncTarget();
+                });
+
+                // ── 11. Export selection as JSON ──
+                $foot.find(".i3x-export-btn").on("click", function () {
+                    var ids = Object.keys(selected);
+                    if (!ids.length) return;
+                    var json = JSON.stringify(ids, null, 2);
+                    var $exportBtn = $(this);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(json).then(function () {
+                            $exportBtn.addClass("copied").find("i").removeClass("fa-clipboard").addClass("fa-check");
+                            setTimeout(function () {
+                                $exportBtn.removeClass("copied").find("i").removeClass("fa-check").addClass("fa-clipboard");
+                            }, 1500);
+                        });
+                    } else {
+                        // fallback: textarea copy
+                        var $ta = $('<textarea style="position:fixed;left:-9999px"></textarea>').val(json).appendTo("body");
+                        $ta[0].select();
+                        document.execCommand("copy");
+                        $ta.remove();
+                        $exportBtn.addClass("copied").find("i").removeClass("fa-clipboard").addClass("fa-check");
+                        setTimeout(function () {
+                            $exportBtn.removeClass("copied").find("i").removeClass("fa-check").addClass("fa-clipboard");
+                        }, 1500);
+                    }
+                });
+
+                // ── 9. Resize handle: drag to change tree height ──
+                (function () {
+                    var startY, startH;
+                    $resizeHandle.on("mousedown", function (e) {
+                        e.preventDefault();
+                        startY = e.clientY;
+                        startH = $tree.outerHeight();
+                        $(document).on("mousemove.i3xresize", function (e2) {
+                            var newH = Math.max(120, Math.min(800, startH + (e2.clientY - startY)));
+                            $tree.css("max-height", newH + "px");
+                        });
+                        $(document).on("mouseup.i3xresize", function () {
+                            $(document).off(".i3xresize");
+                        });
+                    });
+                })();
+
+                // ── 10. Keyboard navigation ──
+                $tree.on("keydown", function (e) {
+                    var $rows = $tree.find(".i3x-bnode-row:visible");
+                    if (!$rows.length) return;
+                    var $focused = $tree.find(".i3x-bnode-row.i3x-kb-focus");
+                    var idx = $focused.length ? $rows.index($focused) : -1;
+
+                    switch (e.key) {
+                        case "ArrowDown":
+                            e.preventDefault();
+                            $rows.removeClass("i3x-kb-focus");
+                            idx = Math.min(idx + 1, $rows.length - 1);
+                            $rows.eq(idx).addClass("i3x-kb-focus");
+                            scrollIntoViewIfNeeded($rows.eq(idx));
+                            break;
+                        case "ArrowUp":
+                            e.preventDefault();
+                            $rows.removeClass("i3x-kb-focus");
+                            idx = Math.max(idx - 1, 0);
+                            $rows.eq(idx).addClass("i3x-kb-focus");
+                            scrollIntoViewIfNeeded($rows.eq(idx));
+                            break;
+                        case " ":
+                            e.preventDefault();
+                            if ($focused.length) $focused.trigger("click");
+                            break;
+                        case "Enter":
+                            e.preventDefault();
+                            if ($focused.length) {
+                                $focused.find(".i3x-bnode-toggle").trigger("click");
+                            }
+                            break;
+                        case "ArrowRight":
+                            e.preventDefault();
+                            if ($focused.length) {
+                                var $ch = $focused.closest(".i3x-bnode").children(".i3x-bnode-children");
+                                if (!$ch.hasClass("open")) {
+                                    $focused.find(".i3x-bnode-toggle").trigger("click");
+                                }
+                            }
+                            break;
+                        case "ArrowLeft":
+                            e.preventDefault();
+                            if ($focused.length) {
+                                var $ch2 = $focused.closest(".i3x-bnode").children(".i3x-bnode-children");
+                                if ($ch2.hasClass("open")) {
+                                    $focused.find(".i3x-bnode-toggle").trigger("click");
+                                } else {
+                                    // jump to parent row
+                                    var $parentRow = $focused.closest(".i3x-bnode").parent().closest(".i3x-bnode").children(".i3x-bnode-row");
+                                    if ($parentRow.length) {
+                                        $rows.removeClass("i3x-kb-focus");
+                                        $parentRow.addClass("i3x-kb-focus");
+                                        scrollIntoViewIfNeeded($parentRow);
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                });
+
+                function scrollIntoViewIfNeeded($el) {
+                    if (!$el.length) return;
+                    var el = $el[0];
+                    var container = $tree[0];
+                    var elTop = el.offsetTop;
+                    var elBot = elTop + el.offsetHeight;
+                    if (elTop < container.scrollTop) {
+                        container.scrollTop = elTop;
+                    } else if (elBot > container.scrollTop + container.clientHeight) {
+                        container.scrollTop = elBot - container.clientHeight;
+                    }
+                }
+
+                $server.on("change", function () {
+                    typesLoaded = false;
+                    searchMode = false;
+                    rendered = {};
+                    if (!collapsed) {
+                        loadTypes();
+                        checkConnectionStatus();
+                    }
+                });
+
+                syncTarget();
+
+                return {
+                    getSelected: function () { return Object.keys(selected); },
+                    destroy: function () { $btn.remove(); $panel.remove(); }
+                };
+            }
+        };
+    })();
 </script>

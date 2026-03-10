@@ -3,7 +3,7 @@
  */
 "use strict";
 
-const { bindServer, safeSend } = require("../lib/node-utils");
+const { bindServer, parseIds, safeSend, statusError } = require("../lib/node-utils");
 
 module.exports = function (RED) {
     function I3XBrowseNode(config) {
@@ -24,13 +24,13 @@ module.exports = function (RED) {
             const client = node.server.client;
 
             const target = msg.browseTarget || node.browseTarget;
-            const elementId = msg.elementId || node.elementId;
+            const ids = parseIds(msg.elementId || node.elementId);
             const typeId = msg.typeId || node.typeId;
             const nsUri = msg.namespaceUri || node.namespaceUri;
             const inclMeta = msg.includeMetadata !== undefined ? msg.includeMetadata : node.includeMetadata;
             const relType = msg.relationshipType || node.relationshipType;
 
-            node.status({ fill: "blue", shape: "dot", text: "requesting..." });
+            node.status({ fill: "blue", shape: "dot", text: "browsing " + target + "..." });
 
             try {
                 let result;
@@ -39,51 +39,46 @@ module.exports = function (RED) {
                         result = await client.getNamespaces();
                         break;
                     case "objecttypes":
-                        if (elementId) {
-                            const ids = Array.isArray(elementId) ? elementId : [elementId];
+                        if (ids.length) {
                             result = await client.queryObjectTypes(ids);
                         } else {
                             result = await client.getObjectTypes({ namespaceUri: nsUri || undefined });
                         }
                         break;
                     case "relationshiptypes":
-                        if (elementId) {
-                            const ids = Array.isArray(elementId) ? elementId : [elementId];
+                        if (ids.length) {
                             result = await client.queryRelationshipTypes(ids);
                         } else {
                             result = await client.getRelationshipTypes({ namespaceUri: nsUri || undefined });
                         }
                         break;
                     case "objects":
-                        if (elementId) {
-                            const ids = Array.isArray(elementId) ? elementId : [elementId];
+                        if (ids.length) {
                             result = await client.listObjects(ids, { includeMetadata: inclMeta });
                         } else {
                             result = await client.getObjects({ typeId: typeId || undefined, includeMetadata: inclMeta });
                         }
                         break;
                     case "related":
-                        if (!elementId) {
+                        if (!ids.length) {
                             throw new Error("elementId is required for related objects query");
                         }
-                        {
-                            const ids = Array.isArray(elementId) ? elementId : [elementId];
-                            result = await client.getRelatedObjects(ids, {
-                                relationshipType: relType || undefined,
-                                includeMetadata: inclMeta,
-                            });
-                        }
+                        result = await client.getRelatedObjects(ids, {
+                            relationshipType: relType || undefined,
+                            includeMetadata: inclMeta,
+                        });
                         break;
                     default:
                         throw new Error("Unknown browse target: " + target);
                 }
 
+                const count = Array.isArray(result) ? result.length : 1;
                 msg.payload = result;
-                node.status({ fill: "green", shape: "dot", text: "ok" });
+                node.status({ fill: "green", shape: "dot", text: count + " " + target });
                 send(msg);
                 if (done) done();
             } catch (err) {
-                node.status({ fill: "red", shape: "ring", text: err.message.substring(0, 32) });
+                node.status({ fill: "red", shape: "ring", text: statusError(err.message) });
                 if (done) done(err); else node.error(err, msg);
             }
         });

@@ -12,6 +12,9 @@
         <input type="text" id="node-input-elementIds" placeholder="comma-separated element IDs to monitor">
     </div>
     <div class="form-row">
+        <div id="i3x-subscribe-browser"></div>
+    </div>
+    <div class="form-row">
         <label for="node-input-mode"><i class="fa fa-exchange"></i> Mode</label>
         <select id="node-input-mode">
             <option value="sse">SSE (Server-Sent Events)</option>
@@ -20,7 +23,7 @@
     </div>
     <div class="form-row i3x-sub-poll">
         <label for="node-input-pollingInterval"><i class="fa fa-clock-o"></i> Poll Interval (ms)</label>
-        <input type="number" id="node-input-pollingInterval" placeholder="5000" min="500" step="500">
+        <input type="number" id="node-input-pollingInterval" placeholder="5000" min="1000" step="1000">
     </div>
     <div class="form-row">
         <label for="node-input-maxDepth"><i class="fa fa-level-down"></i> Max Depth</label>
@@ -46,6 +49,7 @@
     <p><b>Polling mode</b> periodically calls <code>POST /subscriptions/{id}/sync</code> to retrieve and
     clear queued updates. If SSE setup fails, the node automatically falls back to polling.</p>
     <p>The subscription is automatically cleaned up (deleted from the server) when the node is stopped or re-deployed.</p>
+    <p>Use the <b>Browse</b> button to visually select elements from the server.</p>
 </script>
 
 <script type="text/javascript">
@@ -74,6 +78,15 @@
             }
             mode.on("change", togglePoll);
             togglePoll();
+
+            if (window.I3XBrowser) {
+                this._browser = I3XBrowser.create({
+                    container: "#i3x-subscribe-browser",
+                    serverField: "#node-input-server",
+                    targetField: "#node-input-elementIds",
+                    mode: "multi",
+                });
+            }
         },
     });
 </script>

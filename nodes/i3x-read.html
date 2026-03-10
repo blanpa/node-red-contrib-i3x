@@ -12,6 +12,9 @@
         <input type="text" id="node-input-elementIds" placeholder="comma-separated element IDs">
     </div>
     <div class="form-row">
+        <div id="i3x-read-browser"></div>
+    </div>
+    <div class="form-row">
         <label for="node-input-maxDepth"><i class="fa fa-level-down"></i> Max Depth</label>
         <input type="number" id="node-input-maxDepth" placeholder="1" min="0" step="1">
     </div>
@@ -37,6 +40,8 @@
     <h3>Details</h3>
     <p>Uses <code>POST /objects/value</code>. The <code>maxDepth</code> parameter controls whether
     child component values are included recursively.</p>
+    <p>Use the <b>Browse</b> button to visually select elements from the server,
+    or provide element IDs via <code>msg.elementIds</code> at runtime.</p>
 </script>
 
 <script type="text/javascript">
@@ -55,6 +60,16 @@
         paletteLabel: "i3x read",
         label: function () {
             return this.name || this.elementIds || "i3x read";
+        },
+        oneditprepare: function () {
+            if (window.I3XBrowser) {
+                this._browser = I3XBrowser.create({
+                    container: "#i3x-read-browser",
+                    serverField: "#node-input-server",
+                    targetField: "#node-input-elementIds",
+                    mode: "multi",
+                });
+            }
         },
     });
 </script>

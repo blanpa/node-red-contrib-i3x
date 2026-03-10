@@ -3,7 +3,7 @@
  */
 "use strict";
 
-const { bindServer, parseIds } = require("../lib/node-utils");
+const { bindServer, parseIds, statusError, clampMaxDepth } = require("../lib/node-utils");
 
 module.exports = function (RED) {
     function I3XSubscribeNode(config) {
@@ -12,9 +12,8 @@ module.exports = function (RED) {
 
         node.elementIds = config.elementIds || "";
         node.mode = config.mode || "sse";
-        node.pollingInterval = parseInt(config.pollingInterval, 10) || 5000;
-        node.maxDepth = parseInt(config.maxDepth, 10);
-        if (isNaN(node.maxDepth)) node.maxDepth = 1;
+        node.pollingInterval = Math.max(1000, parseInt(config.pollingInterval, 10) || 5000);
+        node.maxDepth = clampMaxDepth(config.maxDepth);
 
         node._subscriptionId = null;
         node._sseHandle = null;
@@ -44,7 +43,7 @@ module.exports = function (RED) {
                     startPolling(client);
                 }
             } catch (err) {
-                node.status({ fill: "red", shape: "ring", text: err.message.substring(0, 32) });
+                node.status({ fill: "red", shape: "ring", text: statusError(err.message) });
                 node.error("Subscription setup failed: " + err.message);
 
                 if (node.mode === "sse" && !node._closing) {
@@ -140,7 +139,11 @@ module.exports = function (RED) {
             setup();
         }
         node.server.on("connected", () => {
-            if (!node._subscriptionId && !node._closing) {
+            if (!node._closing) {
+                // Clean up stale state from a previous connection
+                if (node._pollTimer) { clearInterval(node._pollTimer); node._pollTimer = null; }
+                if (node._sseHandle) { node._sseHandle.close(); node._sseHandle = null; }
+                node._subscriptionId = null;
                 setup();
             }
         });

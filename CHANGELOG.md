@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.0.3 (2026-03-10)
+
+Hardening, security improvements, and new browser widget features.
+
+### Added
+
+- **Live Values in Browser Widget** – The tree view now displays the current value, quality, and timestamp next to each element. Values are fetched automatically when expanding types or children, and on search results. Hover to see full value with quality and timestamp.
+- **Test Connection Button** – Server config panel now includes a "Test Connection" button to verify connectivity without deploying
+- **New admin endpoint** `POST /i3x-server/:id/browse/values` – Batch-reads live values for up to 50 elements (used by browser widget)
+- **`statusError()` utility** – Smarter error message truncation (48 chars with `...`) replacing the hard `substring(0, 32)` cut across all nodes
+- **`clampMaxDepth()` utility** – Validates and clamps `maxDepth` to 0–100 range, preventing negative or excessively large values
+
+### Security
+
+- **HTTPS warning** – Nodes now warn at startup when credentials are sent over plain HTTP to non-localhost servers
+- **Error response sanitization** – `_wrapError()` strips sensitive fields (`token`, `password`, `apiKey`, `secret`) from API error response bodies to prevent accidental credential leakage in logs
+
+### Fixed
+
+- **SSE auth header duplication** – `streamSubscription()` now copies all configured headers cleanly via spread instead of manually duplicating individual auth headers
+- **Poll interval minimum** – Increased from 500ms to 1000ms to prevent accidental API overload
+
+### Changed
+
+- Error status messages across all nodes now show up to 48 characters (was 32)
+- `maxDepth` is validated on all nodes that accept it (read, history, subscribe)
+
 ## 0.0.2 (2026-03-05)
 
 Compliance improvements based on [i3X Client Developer Guidelines](https://www.i3x.dev/sdk/category/client-developers).

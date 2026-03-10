@@ -18,6 +18,9 @@
         <label for="node-input-elementId"><i class="fa fa-crosshairs"></i> Element ID</label>
         <input type="text" id="node-input-elementId" placeholder="target element ID">
     </div>
+    <div class="form-row">
+        <div id="i3x-write-browser"></div>
+    </div>
 </script>
 
 <script type="text/html" data-help-name="i3x-write">
@@ -46,8 +49,8 @@
     to update the current value of the object.</p>
     <p>When <b>Target</b> is set to <i>Historical Data</i>, uses <code>PUT /objects/{elementId}/history</code>
     to write historical time-series records.</p>
-    <p>The payload format must match the element's type schema (e.g. a plain number for
-    <code>measurement-value-type</code>, or a state object for <code>state-type</code>).</p>
+    <p>Use the <b>Browse</b> button to visually select the target element from the server,
+    or provide the element ID via <code>msg.elementId</code> at runtime.</p>
 </script>
 
 <script type="text/javascript">
@@ -68,5 +71,15 @@
             return this.name || this.elementId || "i3x write";
         },
         align: "right",
+        oneditprepare: function () {
+            if (window.I3XBrowser) {
+                this._browser = I3XBrowser.create({
+                    container: "#i3x-write-browser",
+                    serverField: "#node-input-server",
+                    targetField: "#node-input-elementId",
+                    mode: "single",
+                });
+            }
+        },
     });
 </script>

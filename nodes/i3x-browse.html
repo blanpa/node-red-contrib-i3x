@@ -21,6 +21,9 @@
         <label for="node-input-elementId"><i class="fa fa-crosshairs"></i> Element ID</label>
         <input type="text" id="node-input-elementId" placeholder="optional – filter by element ID">
     </div>
+    <div class="form-row i3x-browse-elementId">
+        <div id="i3x-browse-browser"></div>
+    </div>
     <div class="form-row i3x-browse-typeId">
         <label for="node-input-typeId"><i class="fa fa-filter"></i> Type ID</label>
         <input type="text" id="node-input-typeId" placeholder="optional – filter objects by type">
@@ -66,6 +69,7 @@
     <h3>Details</h3>
     <p>This node talks to the <b>Explore</b> endpoints of the i3X API.
     <code>msg</code> properties override the values configured in the node editor.</p>
+    <p>Use the <b>Browse</b> button to visually select an element from the server.</p>
 </script>
 
 <script type="text/javascript">
@@ -101,6 +105,15 @@
             }
             target.on("change", toggle);
             toggle();
+
+            if (window.I3XBrowser) {
+                this._browser = I3XBrowser.create({
+                    container: "#i3x-browse-browser",
+                    serverField: "#node-input-server",
+                    targetField: "#node-input-elementId",
+                    mode: "single",
+                });
+            }
         },
     });
 </script>

@@ -3,7 +3,7 @@
  */
 "use strict";
 
-const { bindServer, safeSend } = require("../lib/node-utils");
+const { bindServer, safeSend, statusError } = require("../lib/node-utils");
 
 module.exports = function (RED) {
     function I3XWriteNode(config) {
@@ -42,11 +42,11 @@ module.exports = function (RED) {
                     : await client.writeValue(elementId, value);
                 msg.payload = result;
                 msg.elementId = elementId;
-                node.status({ fill: "green", shape: "dot", text: "ok" });
+                node.status({ fill: "green", shape: "dot", text: "wrote " + elementId.substring(0, 20) });
                 send(msg);
                 if (done) done();
             } catch (err) {
-                node.status({ fill: "red", shape: "ring", text: err.message.substring(0, 32) });
+                node.status({ fill: "red", shape: "ring", text: statusError(err.message) });
                 if (done) done(err); else node.error(err, msg);
             }
         });

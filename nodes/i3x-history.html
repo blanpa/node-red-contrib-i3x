@@ -12,6 +12,9 @@
         <input type="text" id="node-input-elementIds" placeholder="comma-separated element IDs">
     </div>
     <div class="form-row">
+        <div id="i3x-history-browser"></div>
+    </div>
+    <div class="form-row">
         <label for="node-input-startTime"><i class="fa fa-clock-o"></i> Start Time</label>
         <input type="text" id="node-input-startTime" placeholder="ISO 8601 or relative (e.g. -1h, -7d)">
     </div>
@@ -50,6 +53,7 @@
     <p>Uses <code>POST /objects/history</code>. Time values support both ISO 8601 and
     relative notation: <code>-30s</code> (seconds), <code>-5m</code> (minutes), <code>-1h</code> (hours),
     <code>-7d</code> (days), <code>-1w</code> (weeks).</p>
+    <p>Use the <b>Browse</b> button to visually select elements from the server.</p>
 </script>
 
 <script type="text/javascript">
@@ -70,6 +74,16 @@
         paletteLabel: "i3x history",
         label: function () {
             return this.name || this.elementIds || "i3x history";
+        },
+        oneditprepare: function () {
+            if (window.I3XBrowser) {
+                this._browser = I3XBrowser.create({
+                    container: "#i3x-history-browser",
+                    serverField: "#node-input-server",
+                    targetField: "#node-input-elementIds",
+                    mode: "multi",
+                });
+            }
         },
     });
 </script>
