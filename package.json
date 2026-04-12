@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-i3x",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Node-RED nodes for the i3X (Industrial Information Interoperability eXchange) API by CESMII",
   "keywords": [
     "node-red",
@@ -27,13 +27,13 @@
     "test:docker": "docker compose run --rm test"
   },
   "dependencies": {
-    "axios": "^1.7.0"
+    "axios": "^1.15.0"
   },
   "devDependencies": {
-    "mocha": "^10.0.0",
+    "mocha": "^11.0.0",
     "chai": "^4.0.0",
-    "sinon": "^17.0.0",
-    "nock": "^13.0.0",
+    "sinon": "^21.0.0",
+    "nock": "^14.0.0",
     "node-red": "^3.0.0",
     "node-red-node-test-helper": "^0.3.0"
   },

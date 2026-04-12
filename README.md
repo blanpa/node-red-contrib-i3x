@@ -4,7 +4,7 @@ Node-RED nodes for the **i3X** (Industrial Information Interoperability eXchange
 
 i3X is an open, vendor-agnostic REST API specification for standardised access to contextualised manufacturing information platforms (Historians, MES, MOM, etc.).
 
-> **Note:** The i3X API is currently in **pre-alpha (v0)**. Response structures may change as the specification evolves.
+> **Note:** The i3X API is currently in **beta (v1.0-Beta)**. Response structures may change as the specification evolves.
 
 ## Installation
 
@@ -108,10 +108,11 @@ The shared HTTP client (`lib/i3x-client.js`) implements all [i3X Client Develope
 
 ## API Endpoints Used
 
-This package targets the [i3X API Prototype v0.0.1](https://api.i3x.dev/v0/docs):
+This package targets the [i3X API 1.0-Beta](https://api.i3x.dev/v1/docs):
 
 | Category  | Method | Endpoint                                     |
 | --------- | ------ | -------------------------------------------- |
+| Info      | GET    | `/info`                                      |
 | Explore   | GET    | `/namespaces`                                |
 | Explore   | GET    | `/objecttypes`                               |
 | Explore   | POST   | `/objecttypes/query`                         |
@@ -121,6 +122,7 @@ This package targets the [i3X API Prototype v0.0.1](https://api.i3x.dev/v0/docs)
 | Explore   | POST   | `/objects/list`                              |
 | Explore   | POST   | `/objects/related`                           |
 | Query     | POST   | `/objects/value`                             |
+| Query     | GET    | `/objects/{elementId}/history`               |
 | Query     | POST   | `/objects/history`                           |
 | Update    | PUT    | `/objects/{elementId}/value`                 |
 | Update    | PUT    | `/objects/{elementId}/history`               |

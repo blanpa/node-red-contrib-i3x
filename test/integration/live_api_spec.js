@@ -3,7 +3,7 @@
 const { expect } = require("chai");
 const I3XClient = require("../../lib/i3x-client");
 
-const LIVE_URL = process.env.I3X_BASE_URL || "https://i3x.cesmii.net";
+const LIVE_URL = process.env.I3X_BASE_URL || "https://api.i3x.dev/v1";
 
 describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
     let client;
@@ -65,8 +65,7 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
             expect(objects).to.be.an("array").with.length.greaterThan(0);
             expect(objects[0]).to.have.property("elementId");
             expect(objects[0]).to.have.property("displayName");
-            expect(objects[0]).to.have.property("typeId");
-            expect(objects[0]).to.have.property("namespaceUri");
+            expect(objects[0]).to.have.property("typeElementId");
         });
 
         it("should return objects with metadata", async function () {
@@ -97,9 +96,10 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
             const objects = await client.getObjects();
             const id = objects[0].elementId;
             const result = await client.readValues([id]);
-            expect(result).to.be.an("object");
-            expect(result).to.have.property(id);
-            expect(result[id]).to.have.property("data");
+            expect(result).to.be.an("array").with.length.greaterThan(0);
+            expect(result[0]).to.have.property("success", true);
+            expect(result[0]).to.have.property("elementId", id);
+            expect(result[0]).to.have.property("result");
         });
 
         it("should read values with maxDepth=0 (recursive)", async function () {
@@ -108,11 +108,9 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
             if (!comp) return this.skip();
 
             const result = await client.readValues([comp.elementId], { maxDepth: 0 });
-            expect(result).to.be.an("object");
-            const entry = result[comp.elementId];
-            expect(entry).to.have.property("data");
-            const keys = Object.keys(entry);
-            expect(keys.length).to.be.greaterThan(1);
+            expect(result).to.be.an("array").with.length.greaterThan(0);
+            expect(result[0]).to.have.property("success", true);
+            expect(result[0]).to.have.property("result");
         });
 
         it("should query historical values", async function () {
@@ -121,12 +119,22 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
             const result = await client.readHistory([id], {
                 startTime: new Date(Date.now() - 86400000).toISOString(),
             });
-            expect(result).to.be.an("object");
-            expect(result).to.have.property(id);
+            expect(result).to.be.an("array").with.length.greaterThan(0);
+            expect(result[0]).to.have.property("elementId", id);
         });
     });
 
-    // ── Subscribe lifecycle ────────────────────────────────────────
+    // ── Server Info ──────────────────────────────────────────────────
+
+    describe("server info", function () {
+        it("should return server info via getInfo()", async function () {
+            const info = await client.getInfo();
+            expect(info).to.have.property("specVersion");
+            expect(info).to.have.property("capabilities");
+        });
+    });
+
+    // ── Subscribe lifecycle (Beta-Spec) ─────────────────────────────
 
     describe("subscribe lifecycle", function () {
         let subscriptionId;
@@ -134,14 +142,12 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
         it("should create a subscription", async function () {
             const sub = await client.createSubscription();
             expect(sub).to.have.property("subscriptionId");
-            expect(sub).to.have.property("message");
             subscriptionId = sub.subscriptionId;
         });
 
-        it("should list subscriptions", async function () {
-            const subs = await client.listSubscriptions();
-            expect(subs).to.have.property("subscriptionIds");
-            expect(subs.subscriptionIds).to.be.an("array");
+        it("should list subscriptions by ID", async function () {
+            const subs = await client.listSubscriptions([subscriptionId]);
+            expect(subs).to.exist;
         });
 
         it("should register monitored items", async function () {
@@ -151,14 +157,9 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
             expect(result).to.exist;
         });
 
-        it("should get subscription details", async function () {
-            const detail = await client.getSubscription(subscriptionId);
-            expect(detail).to.exist;
-        });
-
         it("should sync subscription (poll)", async function () {
             const data = await client.syncSubscription(subscriptionId);
-            expect(data).to.be.an("array");
+            expect(data).to.exist;
         });
 
         it("should unregister monitored items", async function () {
@@ -169,7 +170,7 @@ describe("Integration: i3X Live API (" + LIVE_URL + ")", function () {
         });
 
         it("should delete subscription", async function () {
-            const result = await client.deleteSubscription(subscriptionId);
+            const result = await client.deleteSubscriptions([subscriptionId]);
             expect(result).to.exist;
         });
     });

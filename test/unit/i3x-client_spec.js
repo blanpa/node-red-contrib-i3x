@@ -144,10 +144,10 @@ describe("I3XClient", function () {
             expect(result).to.deep.equal(data);
         });
 
-        it("should pass typeId filter", async function () {
+        it("should pass typeId filter as typeElementId", async function () {
             nock(BASE)
                 .get("/objects")
-                .query({ typeId: "sensor-type" })
+                .query({ typeElementId: "sensor-type" })
                 .reply(200, []);
 
             client = new I3XClient({ baseUrl: BASE });
@@ -185,7 +185,7 @@ describe("I3XClient", function () {
             nock(BASE)
                 .post("/objects/related", {
                     elementIds: ["p1"],
-                    relationshiptype: "HasChildren",
+                    relationshipType: "HasChildren",
                 })
                 .reply(200, []);
 
@@ -276,34 +276,60 @@ describe("I3XClient", function () {
         });
     });
 
-    // ── Subscribe endpoints ────────────────────────────────────────
+    // ── Subscribe endpoints (Beta-Spec: body-based) ─────────────
 
     describe("createSubscription()", function () {
-        it("should POST /subscriptions", async function () {
-            const data = { subscriptionId: "42", message: "created" };
+        it("should POST /subscriptions with empty body", async function () {
+            const data = { subscriptionId: "42" };
             nock(BASE).post("/subscriptions", {}).reply(200, data);
 
             client = new I3XClient({ baseUrl: BASE });
             const result = await client.createSubscription();
             expect(result).to.deep.equal(data);
         });
+
+        it("should send clientId and displayName when provided", async function () {
+            nock(BASE)
+                .post("/subscriptions", { clientId: "my-app", displayName: "My App" })
+                .reply(200, { subscriptionId: "2" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.createSubscription({
+                clientId: "my-app",
+                displayName: "My App",
+            });
+            expect(result).to.have.property("subscriptionId", "2");
+        });
     });
 
     describe("listSubscriptions()", function () {
-        it("should GET /subscriptions", async function () {
-            const data = { subscriptionIds: [] };
-            nock(BASE).get("/subscriptions").reply(200, data);
+        it("should POST /subscriptions/list with subscriptionIds", async function () {
+            const data = [{ subscriptionId: "42", monitoredObjects: [] }];
+            nock(BASE)
+                .post("/subscriptions/list", { subscriptionIds: ["42"] })
+                .reply(200, data);
 
             client = new I3XClient({ baseUrl: BASE });
-            const result = await client.listSubscriptions();
+            const result = await client.listSubscriptions(["42"]);
             expect(result).to.deep.equal(data);
+        });
+
+        it("should pass clientId when provided", async function () {
+            nock(BASE)
+                .post("/subscriptions/list", { subscriptionIds: ["42"], clientId: "app1" })
+                .reply(200, []);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.listSubscriptions(["42"], { clientId: "app1" });
+            expect(result).to.deep.equal([]);
         });
     });
 
     describe("registerMonitoredItems()", function () {
-        it("should POST /subscriptions/{id}/register", async function () {
+        it("should POST /subscriptions/register with subscriptionId in body", async function () {
             nock(BASE)
-                .post("/subscriptions/42/register", {
+                .post("/subscriptions/register", {
+                    subscriptionId: "42",
                     elementIds: ["obj1"],
                     maxDepth: 1,
                 })
@@ -313,12 +339,44 @@ describe("I3XClient", function () {
             const result = await client.registerMonitoredItems("42", ["obj1"]);
             expect(result).to.deep.equal({ status: "ok" });
         });
+
+        it("should accept legacy positional maxDepth number", async function () {
+            nock(BASE)
+                .post("/subscriptions/register", {
+                    subscriptionId: "42",
+                    elementIds: ["obj1"],
+                    maxDepth: 3,
+                })
+                .reply(200, { status: "ok" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.registerMonitoredItems("42", ["obj1"], 3);
+            expect(result).to.deep.equal({ status: "ok" });
+        });
+
+        it("should accept options object with maxDepth and clientId", async function () {
+            nock(BASE)
+                .post("/subscriptions/register", {
+                    subscriptionId: "42",
+                    elementIds: ["obj1"],
+                    maxDepth: 2,
+                    clientId: "app1",
+                })
+                .reply(200, { status: "ok" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.registerMonitoredItems("42", ["obj1"], { maxDepth: 2, clientId: "app1" });
+            expect(result).to.deep.equal({ status: "ok" });
+        });
     });
 
     describe("unregisterMonitoredItems()", function () {
-        it("should POST /subscriptions/{id}/unregister", async function () {
+        it("should POST /subscriptions/unregister with subscriptionId in body", async function () {
             nock(BASE)
-                .post("/subscriptions/42/unregister", { elementIds: ["obj1"] })
+                .post("/subscriptions/unregister", {
+                    subscriptionId: "42",
+                    elementIds: ["obj1"],
+                })
                 .reply(200, { status: "ok" });
 
             client = new I3XClient({ baseUrl: BASE });
@@ -327,24 +385,48 @@ describe("I3XClient", function () {
         });
     });
 
-    describe("deleteSubscription()", function () {
-        it("should DELETE /subscriptions/{id}", async function () {
-            nock(BASE).delete("/subscriptions/42").reply(200, { status: "ok" });
+    describe("deleteSubscriptions()", function () {
+        it("should POST /subscriptions/delete with subscriptionIds array", async function () {
+            nock(BASE)
+                .post("/subscriptions/delete", { subscriptionIds: ["42"] })
+                .reply(200, { status: "ok" });
 
             client = new I3XClient({ baseUrl: BASE });
-            const result = await client.deleteSubscription("42");
+            const result = await client.deleteSubscriptions(["42"]);
+            expect(result).to.deep.equal({ status: "ok" });
+        });
+
+        it("should delete multiple subscriptions at once", async function () {
+            nock(BASE)
+                .post("/subscriptions/delete", { subscriptionIds: ["1", "2", "3"] })
+                .reply(200, { status: "ok" });
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.deleteSubscriptions(["1", "2", "3"]);
             expect(result).to.deep.equal({ status: "ok" });
         });
     });
 
     describe("syncSubscription()", function () {
-        it("should POST /subscriptions/{id}/sync", async function () {
+        it("should POST /subscriptions/sync with subscriptionId in body", async function () {
             const data = [{ elementId: "obj1", value: 123 }];
-            nock(BASE).post("/subscriptions/42/sync", {}).reply(200, data);
+            nock(BASE)
+                .post("/subscriptions/sync", { subscriptionId: "42" })
+                .reply(200, data);
 
             client = new I3XClient({ baseUrl: BASE });
             const result = await client.syncSubscription("42");
             expect(result).to.deep.equal(data);
+        });
+
+        it("should send lastSequenceNumber when provided", async function () {
+            nock(BASE)
+                .post("/subscriptions/sync", { subscriptionId: "42", lastSequenceNumber: 15 })
+                .reply(200, [{ elementId: "a", value: 1 }]);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.syncSubscription("42", { lastSequenceNumber: 15 });
+            expect(result).to.deep.equal([{ elementId: "a", value: 1 }]);
         });
     });
 
@@ -600,6 +682,162 @@ describe("I3XClient", function () {
         it("should have a rate limiter instance", function () {
             client = new I3XClient({ baseUrl: BASE });
             expect(client._rateLimiter).to.exist;
+        });
+    });
+
+    // ── GET /info ──────────────────────────────────────────────
+
+    describe("getInfo()", function () {
+        it("should GET /info", async function () {
+            const data = {
+                specVersion: "1.0-Beta",
+                serverVersion: "2.1.0",
+                serverName: "Test i3X Server",
+                capabilities: { subscriptions: true, history: true },
+            };
+            nock(BASE).get("/info").reply(200, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getInfo();
+            expect(result).to.deep.equal(data);
+        });
+
+        it("should cache getInfo results", async function () {
+            const data = { specVersion: "1.0", serverName: "Cached" };
+            const scope = nock(BASE).get("/info").once().reply(200, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const r1 = await client.getInfo();
+            const r2 = await client.getInfo();
+            expect(r1).to.deep.equal(data);
+            expect(r2).to.deep.equal(data);
+            expect(scope.isDone()).to.be.true;
+        });
+    });
+
+    // ── HTTP 206 partial results ───────────────────────────────
+
+    describe("readHistory() partial results", function () {
+        it("should set _partial flag on 206 response", async function () {
+            const data = { obj1: { data: [{ value: 1 }] } };
+            nock(BASE)
+                .post("/objects/history", { elementIds: ["obj1"] })
+                .reply(206, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.readHistory(["obj1"]);
+            expect(result).to.deep.equal({ obj1: { data: [{ value: 1 }] }, _partial: true });
+            expect(result._partial).to.equal(true);
+        });
+
+        it("should not set _partial flag on 200 response", async function () {
+            const data = { obj1: { data: [{ value: 1 }] } };
+            nock(BASE)
+                .post("/objects/history", { elementIds: ["obj1"] })
+                .reply(200, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.readHistory(["obj1"]);
+            expect(result._partial).to.be.undefined;
+        });
+    });
+
+    // ── typeElementId support ──────────────────────────────────
+
+    describe("getObjects() typeElementId", function () {
+        it("should send typeElementId when typeElementId option is used", async function () {
+            nock(BASE)
+                .get("/objects")
+                .query({ typeElementId: "sensor-type" })
+                .reply(200, []);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getObjects({ typeElementId: "sensor-type" });
+            expect(result).to.deep.equal([]);
+        });
+
+        it("should map legacy typeId option to typeElementId param", async function () {
+            nock(BASE)
+                .get("/objects")
+                .query({ typeElementId: "pump-type" })
+                .reply(200, []);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getObjects({ typeId: "pump-type" });
+            expect(result).to.deep.equal([]);
+        });
+
+        it("should prefer typeElementId over typeId when both provided", async function () {
+            nock(BASE)
+                .get("/objects")
+                .query({ typeElementId: "preferred-type" })
+                .reply(200, []);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getObjects({
+                typeElementId: "preferred-type",
+                typeId: "legacy-type",
+            });
+            expect(result).to.deep.equal([]);
+        });
+    });
+
+    // ── getObjects root parameter ─────────────────────────────
+
+    describe("getObjects() root parameter", function () {
+        it("should pass root=true as query param", async function () {
+            nock(BASE)
+                .get("/objects")
+                .query({ root: "true" })
+                .reply(200, [{ elementId: "root1" }]);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getObjects({ root: true });
+            expect(result).to.deep.equal([{ elementId: "root1" }]);
+        });
+    });
+
+    // ── getHistory (single object GET) ────────────────────────
+
+    describe("getHistory()", function () {
+        it("should GET /objects/{elementId}/history", async function () {
+            const data = { values: [{ value: 42, timestamp: "2025-01-01T00:00:00Z" }] };
+            nock(BASE).get("/objects/obj1/history").reply(200, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getHistory("obj1");
+            expect(result).to.deep.equal(data);
+        });
+
+        it("should pass startTime and endTime as query params", async function () {
+            nock(BASE)
+                .get("/objects/obj1/history")
+                .query({ startTime: "2025-01-01T00:00:00Z", endTime: "2025-01-02T00:00:00Z" })
+                .reply(200, {});
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getHistory("obj1", {
+                startTime: "2025-01-01T00:00:00Z",
+                endTime: "2025-01-02T00:00:00Z",
+            });
+            expect(result).to.deep.equal({});
+        });
+
+        it("should URL-encode elementId", async function () {
+            nock(BASE).get("/objects/id%20with%20spaces/history").reply(200, {});
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getHistory("id with spaces");
+            expect(result).to.deep.equal({});
+        });
+
+        it("should set _partial flag on 206 response", async function () {
+            const data = { values: [{ value: 1 }] };
+            nock(BASE).get("/objects/obj1/history").reply(206, data);
+
+            client = new I3XClient({ baseUrl: BASE });
+            const result = await client.getHistory("obj1");
+            expect(result._partial).to.equal(true);
         });
     });
 });

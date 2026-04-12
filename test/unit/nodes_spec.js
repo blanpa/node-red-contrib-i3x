@@ -666,12 +666,18 @@ describe("i3x Node-RED Nodes", function () {
                 .post("/subscriptions", {})
                 .reply(200, { subscriptionId: "99", message: "ok" });
             nock(BASE)
-                .post("/subscriptions/99/register")
+                .post("/subscriptions/register", {
+                    subscriptionId: "99",
+                    elementIds: ["a"],
+                    maxDepth: 1,
+                })
                 .reply(200, { status: "ok" });
             nock(BASE)
-                .post("/subscriptions/99/sync", {})
+                .post("/subscriptions/sync", { subscriptionId: "99" })
                 .reply(200, [{ elementId: "a", value: 1 }]);
-            nock(BASE).delete("/subscriptions/99").reply(200, {});
+            nock(BASE)
+                .post("/subscriptions/delete", { subscriptionIds: ["99"] })
+                .reply(200, {});
 
             const flow = [
                 serverConfig(),

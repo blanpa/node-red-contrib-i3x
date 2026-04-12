@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.0.4 (2026-04-12)
+
+Migration to i3X API 1.0-Beta specification with enhanced query capabilities and improved API alignment.
+
+### Added
+
+- **Server Info Endpoint** – New `getInfo()` method retrieves server metadata (spec version, server version, capabilities) from `GET /info` endpoint with TTL caching
+- **Single-Object History Query** – New `getHistory(elementId, options)` method for `GET /objects/{elementId}/history` endpoint
+- **Partial Response Handling** – History queries now detect HTTP 206 status and set `_partial: true` flag on results when server returns incomplete data
+- **Root Objects Filter** – `getObjects()` now supports `root: true` parameter to retrieve only root-level objects
+- **Enhanced Subscribe Options** – Subscribe node now supports `maxDepth`, `includeMetadata`, and `returnMode` parameters for fine-grained control
+
+### Changed
+
+- **API Version Update** – Updated from i3X v0.0.1 to 1.0-Beta specification
+- **API Documentation URL** – Changed from `https://i3x.cesmii.net/docs` to `https://api.i3x.dev/v1/docs`
+- **Parameter Naming** – `typeId` parameter renamed to `typeElementId` in `getObjects()` (legacy `typeId` still supported as alias)
+- **Relationship Type Parameter** – Fixed casing from `relationshiptype` to `relationshipType` in `getRelatedObjects()`
+- **History Query Implementation** – `getHistoryBulk()` now uses `_requestRaw()` to access HTTP status codes for partial response detection
+
+### Tests
+
+- Updated all test cases to reflect 1.0-Beta API changes
+- Added tests for new `getInfo()` endpoint
+- Added tests for single-object history query
+- Added tests for partial response handling (HTTP 206)
+- Updated integration tests for new parameter names
+
 ## 0.0.3 (2026-03-10)
 
 Hardening, security improvements, and new browser widget features.

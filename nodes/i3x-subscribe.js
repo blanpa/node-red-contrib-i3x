@@ -125,7 +125,7 @@ module.exports = function (RED) {
 
             if (node._subscriptionId && node.server && node.server.client) {
                 try {
-                    await node.server.client.deleteSubscription(node._subscriptionId);
+                    await node.server.client.deleteSubscriptions([node._subscriptionId]);
                 } catch (_) {
                     // best-effort cleanup
                 }
