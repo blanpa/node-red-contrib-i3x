@@ -43,11 +43,13 @@
     </dl>
 
     <h3>Details</h3>
-    <p>Creates a server-side subscription via the i3X Subscribe API and monitors the specified elements.</p>
-    <p><b>SSE mode</b> opens a persistent Server-Sent Events stream (<code>GET /subscriptions/{id}/stream</code>)
+    <p>Creates a server-side subscription via the i3X Subscribe API and monitors the specified elements.
+    Subscriptions are scoped by a <code>clientId</code> derived from the server config node (required by i3X 1.0).</p>
+    <p><b>SSE mode</b> opens a persistent Server-Sent Events stream (<code>POST /subscriptions/stream</code>)
     and emits messages in real-time as values change.</p>
-    <p><b>Polling mode</b> periodically calls <code>POST /subscriptions/{id}/sync</code> to retrieve and
-    clear queued updates. If SSE setup fails, the node automatically falls back to polling.</p>
+    <p><b>Polling mode</b> periodically calls <code>POST /subscriptions/sync</code> to retrieve queued
+    update batches; previously received batches are acknowledged via their sequence number. If SSE setup
+    fails — or the server does not support streaming (HTTP 501) — the node automatically falls back to polling.</p>
     <p>The subscription is automatically cleaned up (deleted from the server) when the node is stopped or re-deployed.</p>
     <p>Use the <b>Browse</b> button to visually select elements from the server.</p>
 </script>

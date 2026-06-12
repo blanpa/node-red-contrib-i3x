@@ -363,7 +363,9 @@ describe("i3x Node-RED Nodes", function () {
         it("should write value to elementId", function (done) {
             nock(BASE).get("/namespaces").reply(200, []);
             nock(BASE)
-                .put("/objects/sensor-001/value", { value: 99.5 })
+                .put("/objects/value", {
+                    updates: [{ elementId: "sensor-001", value: { value: 99.5 } }],
+                })
                 .reply(200, { status: "ok" });
 
             const flow = [
@@ -391,7 +393,9 @@ describe("i3x Node-RED Nodes", function () {
         it("should override elementId via msg", function (done) {
             nock(BASE).get("/namespaces").reply(200, []);
             nock(BASE)
-                .put("/objects/override-id/value", (body) => body === 42)
+                .put("/objects/value", (body) =>
+                    body.updates[0].elementId === "override-id" &&
+                    body.updates[0].value.value === 42)
                 .reply(200, { status: "ok" });
 
             const flow = [
@@ -462,10 +466,13 @@ describe("i3x Node-RED Nodes", function () {
 
         it("should write history when writeTarget is 'history'", function (done) {
             nock(BASE).get("/namespaces").reply(200, []);
-            const histData = [{ value: 68.2, quality: "GOOD", timestamp: "2025-06-01T10:00:00Z" }];
+            const histData = [{ value: 68.2, quality: "Good", timestamp: "2025-06-01T10:00:00Z" }];
             nock(BASE)
-                .put("/objects/sensor-001/history", (body) => {
-                    return Array.isArray(body) && body[0].value === 68.2;
+                .put("/objects/history", (body) => {
+                    const u = body.updates[0];
+                    return u.elementId === "sensor-001" &&
+                        u.value.value === 68.2 &&
+                        u.value.timestamp === "2025-06-01T10:00:00Z";
                 })
                 .reply(200, { status: "ok" });
 
@@ -495,7 +502,10 @@ describe("i3x Node-RED Nodes", function () {
         it("should override writeTarget via msg", function (done) {
             nock(BASE).get("/namespaces").reply(200, []);
             nock(BASE)
-                .put("/objects/sensor-001/history", (body) => body === 99)
+                .put("/objects/history", (body) =>
+                    body.updates[0].elementId === "sensor-001" &&
+                    body.updates[0].value.value === 99 &&
+                    body.updates[0].value.quality === "Good")
                 .reply(200, { status: "ok" });
 
             const flow = [
@@ -661,22 +671,25 @@ describe("i3x Node-RED Nodes", function () {
         });
 
         it("should create subscription and poll on connected", function (done) {
+            // clientId is derived from the config-node id ("server1")
+            const CLIENT_ID = "node-red-server1";
             nock(BASE).get("/namespaces").reply(200, []);
             nock(BASE)
-                .post("/subscriptions", {})
+                .post("/subscriptions", { clientId: CLIENT_ID })
                 .reply(200, { subscriptionId: "99", message: "ok" });
             nock(BASE)
                 .post("/subscriptions/register", {
+                    clientId: CLIENT_ID,
                     subscriptionId: "99",
                     elementIds: ["a"],
                     maxDepth: 1,
                 })
                 .reply(200, { status: "ok" });
             nock(BASE)
-                .post("/subscriptions/sync", { subscriptionId: "99" })
-                .reply(200, [{ elementId: "a", value: 1 }]);
+                .post("/subscriptions/sync", { clientId: CLIENT_ID, subscriptionId: "99" })
+                .reply(200, [{ sequenceNumber: 1, updates: [{ elementId: "a", value: 1 }] }]);
             nock(BASE)
-                .post("/subscriptions/delete", { subscriptionIds: ["99"] })
+                .post("/subscriptions/delete", { clientId: CLIENT_ID, subscriptionIds: ["99"] })
                 .reply(200, {});
 
             const flow = [

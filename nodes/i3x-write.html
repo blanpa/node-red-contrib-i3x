@@ -29,7 +29,10 @@
     <h3>Inputs</h3>
     <dl class="message-properties">
         <dt>payload <span class="property-type">any</span></dt>
-        <dd>The value to write. Format depends on the element type schema.</dd>
+        <dd>The value to write. Either a plain value (wrapped automatically) or a
+        VQT object <code>{value, quality, timestamp}</code>. For history writes an
+        array of VQTs writes multiple records at once; missing <code>quality</code>
+        defaults to <code>"Good"</code>, missing <code>timestamp</code> to now.</dd>
         <dt class="optional">elementId <span class="property-type">string</span></dt>
         <dd>Target element ID. Overrides the configured value. Also accepts <code>msg.nodeId</code>.</dd>
         <dt class="optional">writeTarget <span class="property-type">string</span></dt>
@@ -45,10 +48,10 @@
     </dl>
 
     <h3>Details</h3>
-    <p>When <b>Target</b> is set to <i>Current Value</i>, uses <code>PUT /objects/{elementId}/value</code>
+    <p>When <b>Target</b> is set to <i>Current Value</i>, uses <code>PUT /objects/value</code>
     to update the current value of the object.</p>
-    <p>When <b>Target</b> is set to <i>Historical Data</i>, uses <code>PUT /objects/{elementId}/history</code>
-    to write historical time-series records.</p>
+    <p>When <b>Target</b> is set to <i>Historical Data</i>, uses <code>PUT /objects/history</code>
+    to write historical time-series records (i3X 1.0 bulk update format).</p>
     <p>Use the <b>Browse</b> button to visually select the target element from the server,
     or provide the element ID via <code>msg.elementId</code> at runtime.</p>
 </script>

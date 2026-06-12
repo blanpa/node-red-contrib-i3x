@@ -22,6 +22,10 @@ module.exports = function (RED) {
             apiVersion: node.apiVersion,
             authType: node.authType,
             timeout: node.timeout,
+            // 1.0 spec: clientId is required on all subscription endpoints and
+            // scopes subscriptions per client. The config-node id is stable
+            // across restarts, so subscriptions survive a redeploy cleanly.
+            clientId: "node-red-" + node.id.replace(/\./g, "-"),
         };
 
         if (node.credentials) {

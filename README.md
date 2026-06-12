@@ -4,7 +4,7 @@ Node-RED nodes for the **i3X** (Industrial Information Interoperability eXchange
 
 i3X is an open, vendor-agnostic REST API specification for standardised access to contextualised manufacturing information platforms (Historians, MES, MOM, etc.).
 
-> **Note:** The i3X API is currently in **beta (v1.0-Beta)**. Response structures may change as the specification evolves.
+> **Note:** This package targets the **i3X API 1.0 Release** (finalized 2026-06-09). The specification is stable; the next revision is not expected before the vNext working group convenes in late 2026.
 
 ## Installation
 
@@ -108,32 +108,33 @@ The shared HTTP client (`lib/i3x-client.js`) implements all [i3X Client Develope
 
 ## API Endpoints Used
 
-This package targets the [i3X API 1.0-Beta](https://api.i3x.dev/v1/docs):
+This package targets the [i3X API 1.0 Release](https://api.i3x.dev/v1/docs):
 
-| Category  | Method | Endpoint                                     |
-| --------- | ------ | -------------------------------------------- |
-| Info      | GET    | `/info`                                      |
-| Explore   | GET    | `/namespaces`                                |
-| Explore   | GET    | `/objecttypes`                               |
-| Explore   | POST   | `/objecttypes/query`                         |
-| Explore   | GET    | `/relationshiptypes`                         |
-| Explore   | POST   | `/relationshiptypes/query`                   |
-| Explore   | GET    | `/objects`                                   |
-| Explore   | POST   | `/objects/list`                              |
-| Explore   | POST   | `/objects/related`                           |
-| Query     | POST   | `/objects/value`                             |
-| Query     | GET    | `/objects/{elementId}/history`               |
-| Query     | POST   | `/objects/history`                           |
-| Update    | PUT    | `/objects/{elementId}/value`                 |
-| Update    | PUT    | `/objects/{elementId}/history`               |
-| Subscribe | GET    | `/subscriptions`                             |
-| Subscribe | POST   | `/subscriptions`                             |
-| Subscribe | GET    | `/subscriptions/{subscriptionId}`            |
-| Subscribe | DELETE | `/subscriptions/{subscriptionId}`            |
-| Subscribe | POST   | `/subscriptions/{subscriptionId}/register`   |
-| Subscribe | POST   | `/subscriptions/{subscriptionId}/unregister` |
-| Subscribe | GET    | `/subscriptions/{subscriptionId}/stream`     |
-| Subscribe | POST   | `/subscriptions/{subscriptionId}/sync`       |
+| Category  | Method | Endpoint                     |
+| --------- | ------ | ---------------------------- |
+| Info      | GET    | `/info`                      |
+| Explore   | GET    | `/namespaces`                |
+| Explore   | GET    | `/objecttypes`               |
+| Explore   | POST   | `/objecttypes/query`         |
+| Explore   | GET    | `/relationshiptypes`         |
+| Explore   | POST   | `/relationshiptypes/query`   |
+| Explore   | GET    | `/objects`                   |
+| Explore   | POST   | `/objects/list`              |
+| Explore   | POST   | `/objects/related`           |
+| Query     | POST   | `/objects/value`             |
+| Query     | POST   | `/objects/history`           |
+| Update    | PUT    | `/objects/value`             |
+| Update    | PUT    | `/objects/history`           |
+| Subscribe | POST   | `/subscriptions`             |
+| Subscribe | POST   | `/subscriptions/list`        |
+| Subscribe | POST   | `/subscriptions/delete`      |
+| Subscribe | POST   | `/subscriptions/register`    |
+| Subscribe | POST   | `/subscriptions/unregister`  |
+| Subscribe | POST   | `/subscriptions/stream`      |
+| Subscribe | POST   | `/subscriptions/sync`        |
+
+All subscription requests carry the spec-required `clientId` (derived from the
+server config node), which scopes subscriptions per client.
 
 ## Example Flows
 

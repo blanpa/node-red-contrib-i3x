@@ -601,7 +601,7 @@
         "type": "comment",
         "z": "i3x-demo-tab",
         "name": "=== 3. WRITE - Write values ===",
-        "info": "The **i3x-write** node writes a value to an i3X object.\n\n**API endpoint:** `PUT /objects/{elementId}/value`\n\n**Input:**\n- `msg.payload` - The value to write (must match the element's type schema)\n- `msg.elementId` or node property - Target element\n\n**Output:**\n- `msg.payload` - Server confirmation (`{ success, message }`)\n- `msg.elementId` - The element ID that was written to\n\n**Payload format depends on the element type:**\n- `state-type` → object: `{ description, color, type: { id, name, description }, metadata: { ... } }`\n- `measurement-value-type` / `sensor-type` → plain number (e.g. `72.5`)\n- `measurement-health-type` → integer (e.g. `95`)\n\n**Analogy:** Comparable to OPC UA Write or S7 OUT.",
+        "info": "The **i3x-write** node writes a value to an i3X object.\n\n**API endpoint:** `PUT /objects/value` (bulk update format)\n\n**Input:**\n- `msg.payload` - The value to write (must match the element's type schema)\n- `msg.elementId` or node property - Target element\n\n**Output:**\n- `msg.payload` - Server confirmation (`{ success, message }`)\n- `msg.elementId` - The element ID that was written to\n\n**Payload format depends on the element type:**\n- `state-type` → object: `{ description, color, type: { id, name, description }, metadata: { ... } }`\n- `measurement-value-type` / `sensor-type` → plain number (e.g. `72.5`)\n- `measurement-health-type` → integer (e.g. `95`)\n\n**Analogy:** Comparable to OPC UA Write or S7 OUT.",
         "x": 270,
         "y": 800,
         "wires": []
@@ -974,7 +974,7 @@
         "type": "comment",
         "z": "i3x-demo-tab",
         "name": "=== 5. SUBSCRIBE - Monitor value changes ===",
-        "info": "The **i3x-subscribe** node monitors value changes and outputs a message on each update.\n\n**Modes:**\n- **SSE** (Server-Sent Events) – Real-time stream via `GET /subscriptions/{id}/stream`\n- **Polling** – Periodic sync via `POST /subscriptions/{id}/sync`\n\n**Behaviour:**\n- Automatically creates a subscription on deploy\n- Registers the specified element IDs as monitored items\n- Automatically deletes the subscription on stop/re-deploy\n- If SSE fails, automatically falls back to polling\n\n**Analogy:** Comparable to MQTT IN or OPC UA Subscription.\n\n**Note:** This node has no input – it starts automatically on deploy.",
+        "info": "The **i3x-subscribe** node monitors value changes and outputs a message on each update.\n\n**Modes:**\n- **SSE** (Server-Sent Events) – Real-time stream via `POST /subscriptions/stream`\n- **Polling** – Periodic sync via `POST /subscriptions/sync`\n\n**Behaviour:**\n- Automatically creates a subscription on deploy\n- Registers the specified element IDs as monitored items\n- Automatically deletes the subscription on stop/re-deploy\n- If SSE fails, automatically falls back to polling\n\n**Analogy:** Comparable to MQTT IN or OPC UA Subscription.\n\n**Note:** This node has no input – it starts automatically on deploy.",
         "x": 310,
         "y": 1320,
         "wires": []

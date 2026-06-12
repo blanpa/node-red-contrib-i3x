@@ -19,6 +19,7 @@ module.exports = function (RED) {
         node._sseHandle = null;
         node._pollTimer = null;
         node._closing = false;
+        node._lastSequenceNumber = undefined;
 
         if (!bindServer(node, RED, config.server)) return;
 
@@ -77,6 +78,13 @@ module.exports = function (RED) {
                 },
                 onError: (err) => {
                     if (node._closing) return;
+                    // 1.0 spec: poll-only servers return 501 for /stream
+                    if (err.statusCode === 501) {
+                        node.warn("Server does not support SSE streaming (501) – falling back to polling");
+                        node._sseHandle = null;
+                        startPolling(client);
+                        return;
+                    }
                     node.status({ fill: "red", shape: "ring", text: "stream error" });
                     node.error("SSE stream error: " + err.message);
                 },
@@ -94,9 +102,29 @@ module.exports = function (RED) {
             async function poll() {
                 if (node._closing) return;
                 try {
-                    const data = await client.syncSubscription(node._subscriptionId);
-                    if (data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
-                        node.send({ payload: data, topic: "i3x/subscription" });
+                    // Acknowledge everything received so far, then fetch pending batches
+                    const opts = {};
+                    if (node._lastSequenceNumber !== undefined) {
+                        opts.lastSequenceNumber = node._lastSequenceNumber;
+                    }
+                    const batches = await client.syncSubscription(node._subscriptionId, opts);
+                    // 1.0 spec: [{sequenceNumber, updates: [...]}, ...]
+                    const updates = [];
+                    for (const batch of Array.isArray(batches) ? batches : []) {
+                        if (batch && typeof batch === "object" && Array.isArray(batch.updates)) {
+                            updates.push(...batch.updates);
+                            if (typeof batch.sequenceNumber === "number") {
+                                node._lastSequenceNumber = node._lastSequenceNumber === undefined
+                                    ? batch.sequenceNumber
+                                    : Math.max(node._lastSequenceNumber, batch.sequenceNumber);
+                            }
+                        } else if (batch !== null && batch !== undefined) {
+                            // tolerate pre-1.0 servers returning a flat update list
+                            updates.push(batch);
+                        }
+                    }
+                    if (updates.length > 0) {
+                        node.send({ payload: updates, topic: "i3x/subscription" });
                     }
                 } catch (err) {
                     if (!node._closing) {
@@ -144,6 +172,7 @@ module.exports = function (RED) {
                 if (node._pollTimer) { clearInterval(node._pollTimer); node._pollTimer = null; }
                 if (node._sseHandle) { node._sseHandle.close(); node._sseHandle = null; }
                 node._subscriptionId = null;
+                node._lastSequenceNumber = undefined;
                 setup();
             }
         });

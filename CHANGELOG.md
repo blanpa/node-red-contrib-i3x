@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.0.5 (2026-06-12)
+
+Migration to the **i3X API 1.0 Release** specification (finalized 2026-06-09). See the
+[official i3X changelog](https://github.com/cesmii/i3X/blob/1.0/CHANGELOG.md) for the
+spec-side deltas this release adopts.
+
+### Breaking (spec-mandated)
+
+- **Bulk write endpoints** – `PUT /objects/{elementId}/value` and `PUT /objects/{elementId}/history`
+  were removed from the spec. `writeValue()` / `writeHistory()` now use the bulk endpoints
+  `PUT /objects/value` and `PUT /objects/history` with `{"updates": [{"elementId", "value"}]}`
+  bodies. Values are normalised to VQT objects (`{value, quality, timestamp}`); history writes
+  default missing `quality` to `"Good"` and missing `timestamp` to the current UTC time.
+- **`clientId` required on all subscription endpoints** – create, list, delete, register,
+  unregister, stream, and sync now always send a `clientId` (1.0 servers reject requests
+  without one with 400). The i3x-server config node derives a stable `clientId` from its
+  node id; it can be overridden per call or via the `I3XClient` constructor.
+- **`GET /objects/{elementId}/history` removed** – `getHistory()` is deprecated and now
+  delegates to the bulk `POST /objects/history` endpoint, returning its bulk result array.
+
+### Added
+
+- `writeValues(updates)` – bulk-write current values of multiple objects in one request
+- Sync acknowledgement – the subscribe node tracks batch `sequenceNumber`s and acknowledges
+  received updates via `lastSequenceNumber` on the next poll; `lastSequenceNumber = -1`
+  (acknowledge all) is supported by the client
+- Poll-only server support – servers may answer `/subscriptions/stream` with HTTP 501;
+  the subscribe node now detects this and falls back to sync polling automatically
+
+### Changed
+
+- Sync responses are handled in the new batched format `[{sequenceNumber, updates: [...]}]`
+  (flat pre-1.0 responses are still tolerated); the subscribe node emits the flattened updates
+- Error details are read from the new `responseDetail` envelope field (with fallback to
+  the older `problemDetail` and `error` shapes) and appended to error messages
+- Write payload sanitization now validates against the VQT fields (`value`, `quality`,
+  `timestamp`); unknown fields are rejected to avoid silent data loss
+- README and node help texts updated to the 1.0 Release endpoint set
+
 ## 0.0.4 (2026-04-12)
 
 Migration to i3X API 1.0-Beta specification with enhanced query capabilities and improved API alignment.
