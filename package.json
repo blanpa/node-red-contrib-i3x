@@ -30,12 +30,12 @@
     "axios": "^1.15.0"
   },
   "devDependencies": {
-    "mocha": "^11.0.0",
     "chai": "^4.0.0",
-    "sinon": "^21.0.0",
+    "mocha": "^11.0.0",
     "nock": "^14.0.0",
-    "node-red": "^3.0.0",
-    "node-red-node-test-helper": "^0.3.0"
+    "node-red": "^4.1.11",
+    "node-red-node-test-helper": "^0.3.6",
+    "sinon": "^21.0.0"
   },
   "node-red": {
     "version": ">=2.0.0",
@@ -48,7 +48,10 @@
       "i3x-subscribe": "nodes/i3x-subscribe.js"
     },
     "examples": [
-      { "name": "i3x-complete-demo", "path": "examples/i3x-complete-demo.json" }
+      {
+        "name": "i3x-complete-demo",
+        "path": "examples/i3x-complete-demo.json"
+      }
     ]
   },
   "engines": {
