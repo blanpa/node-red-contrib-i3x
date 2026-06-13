@@ -7,6 +7,9 @@ name: Publish to npm
 # (siehe Hinweise unten in dieser Datei).
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
@@ -58,6 +61,8 @@ jobs:
 #
 # Veröffentlichung auslösen:
 #   - package.json "version" erhöhen + committen
-#   - Git-Tag + GitHub Release erstellen (z. B. v0.0.6)  ->  Workflow läuft automatisch
+#   - Git-Tag "v<version>" pushen (z. B. `git tag v0.0.6 && git push origin v0.0.6`)
+#     ->  Workflow läuft automatisch (Trigger: push auf Tags "v*")
+#   - alternativ ein GitHub Release veröffentlichen
 #   - oder manuell über Actions -> "Publish to npm" -> "Run workflow"
 # ─────────────────────────────────────────────────────────────────────────
