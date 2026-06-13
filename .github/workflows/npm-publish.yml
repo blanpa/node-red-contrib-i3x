@@ -1,0 +1,63 @@
+name: Publish to npm
+
+# Veröffentlicht das Paket via npm Trusted Publishing (OIDC).
+# Es wird KEIN NPM_TOKEN benötigt — die Authentifizierung läuft über
+# kurzlebige OIDC-Tokens. Voraussetzung: Auf npmjs.com muss unter
+# "Settings -> Trusted Publishers" dieses Repo + Workflow hinterlegt sein
+# (siehe Hinweise unten in dieser Datei).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Erforderlich für OIDC Trusted Publishing.
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing benötigt npm >= 11.5.1.
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      # Provenance wird bei Trusted Publishing automatisch erzeugt.
+      - name: Publish
+        run: npm publish --access public
+
+# ─────────────────────────────────────────────────────────────────────────
+# Einmalige Einrichtung auf npmjs.com (nur beim ersten Mal nötig):
+#
+# 1. https://www.npmjs.com/package/node-red-contrib-i3x  ->  Settings
+# 2. Abschnitt "Trusted Publishers"  ->  "GitHub Actions" hinzufügen
+# 3. Werte eintragen:
+#      Organization or user:  blanpa
+#      Repository:            node-red-contrib-i3x
+#      Workflow filename:     npm-publish.yml
+#      Environment:           (leer lassen)
+# 4. Speichern. Ab dann publisht dieser Workflow ohne Secret/Token.
+#
+# Veröffentlichung auslösen:
+#   - package.json "version" erhöhen + committen
+#   - Git-Tag + GitHub Release erstellen (z. B. v0.0.6)  ->  Workflow läuft automatisch
+#   - oder manuell über Actions -> "Publish to npm" -> "Run workflow"
+# ─────────────────────────────────────────────────────────────────────────
