@@ -68,10 +68,12 @@ Write a current value or historical data to an i3X object.
 - **Target:** `value` (default) or `history` – selectable via dropdown or `msg.writeTarget`
 - **Output:** `msg.payload` – write confirmation from the API
 
-| Target    | API Endpoint                          | Payload format                        |
-| --------- | ------------------------------------- | ------------------------------------- |
-| `value`   | `PUT /objects/{elementId}/value`      | Depends on type schema (number, object, …) |
-| `history` | `PUT /objects/{elementId}/history`    | Array of VQT records `[{value, quality, timestamp}, …]` |
+| Target    | API Endpoint          | Payload format                        |
+| --------- | --------------------- | ------------------------------------- |
+| `value`   | `PUT /objects/value`  | A value or VQT object `{value, quality?, timestamp?}` |
+| `history` | `PUT /objects/history`| A VQT or array of VQT records `[{value, quality, timestamp}, …]` |
+
+Both use the i3X 1.0 bulk update format (`{updates: [{elementId, value}]}`); the node builds it for you. For history writes a missing `quality` defaults to `"Good"` and a missing `timestamp` to the current UTC time.
 
 ### i3x-history
 
@@ -85,10 +87,10 @@ Query historical time-series data.
 
 Subscribe to value changes via SSE streaming or polling.
 
-- **SSE mode:** Opens a persistent Server-Sent Events stream (`GET /subscriptions/{id}/stream`)
-- **Polling mode:** Periodically calls `POST /subscriptions/{id}/sync`
-- **Fallback:** If SSE fails, the node automatically falls back to polling
-- **Lifecycle:** Subscriptions are created on deploy and deleted on stop/re-deploy
+- **SSE mode:** Opens a persistent Server-Sent Events stream (`POST /subscriptions/stream`)
+- **Polling mode:** Periodically calls `POST /subscriptions/sync`, acknowledging received batches by sequence number
+- **Fallback:** If SSE fails — or the server returns HTTP 501 (streaming not supported) — the node automatically falls back to polling
+- **Lifecycle:** Subscriptions are created on deploy and deleted on stop/re-deploy; all calls are scoped by a `clientId` derived from the server config node (required by i3X 1.0)
 
 ## Built-in Resilience & Best Practices
 
