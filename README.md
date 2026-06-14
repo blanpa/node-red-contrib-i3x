@@ -1,10 +1,114 @@
 # node-red-contrib-i3x
 
+[![npm version](https://img.shields.io/npm/v/node-red-contrib-i3x.svg)](https://www.npmjs.com/package/node-red-contrib-i3x)
+[![CI](https://github.com/blanpa/node-red-contrib-i3x/actions/workflows/ci.yml/badge.svg)](https://github.com/blanpa/node-red-contrib-i3x/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Node.js](https://img.shields.io/node/v/node-red-contrib-i3x.svg)](https://nodejs.org)
+[![i3X API](https://img.shields.io/badge/i3X%20API-1.0%20Release-5DB87C.svg)](https://www.i3x.dev)
+
 Node-RED nodes for the **i3X** (Industrial Information Interoperability eXchange) API by [CESMII](https://www.cesmii.org).
 
 i3X is an open, vendor-agnostic REST API specification for standardised access to contextualised manufacturing information platforms (Historians, MES, MOM, etc.).
 
+This package is an i3X **client**: it lets your Node-RED flows browse, read, write, query history, and subscribe against any compliant i3X server. (If you instead need to *expose* an OPC UA address space as an i3X server, see projects like [`node-opcua/node-i3x`](https://github.com/node-opcua/node-i3x) — the two are complementary.)
+
 > **Note:** This package targets the **i3X API 1.0 Release** (finalized 2026-06-09). The specification is stable; the next revision is not expected before the vNext working group convenes in late 2026.
+
+## Architecture
+
+### Where i3X sits
+
+i3X is a standardised REST facade in front of heterogeneous manufacturing
+information platforms. This package lets Node-RED act as an **i3X client**,
+talking to any compliant i3X server over HTTPS.
+
+```mermaid
+flowchart LR
+    subgraph SHOP["Shop floor / OT"]
+        PLC["PLCs · Sensors"]
+        OPC["OPC UA"]
+    end
+
+    subgraph PLATFORM["Information platforms"]
+        HIST["Historian"]
+        MES["MES / MOM"]
+    end
+
+    subgraph I3X["i3X Server (REST API 1.0)"]
+        MODEL["Information Model\n(namespaces · types · objects · relationships)"]
+        API["REST endpoints\n/objects · /history · /subscriptions"]
+    end
+
+    subgraph NR["Node-RED + node-red-contrib-i3x"]
+        NODES["i3x nodes"]
+        FLOWS["Your flows / dashboards"]
+    end
+
+    PLC --> OPC --> PLATFORM
+    PLATFORM --> I3X
+    MODEL --- API
+    API -- "HTTPS / SSE" --> NODES --> FLOWS
+```
+
+### Package internals
+
+Every node delegates HTTP work to a single shared `I3XClient`, configured once
+through the `i3x-server` config node. The client centralises all resilience
+features (retry, caching, rate limiting, TLS, SSE reconnection).
+
+```mermaid
+flowchart TB
+    subgraph EDITOR["Node-RED flow"]
+        BROWSE["i3x-browse\nexplore model"]
+        READ["i3x-read\nlast values"]
+        WRITE["i3x-write\nvalue / history"]
+        HISTORY["i3x-history\ntime series"]
+        SUB["i3x-subscribe\nSSE / polling"]
+    end
+
+    CONFIG["i3x-server (config node)\nBase URL · Auth · TLS · Timeout · clientId"]
+
+    subgraph CLIENT["lib/i3x-client.js — shared HTTP client"]
+        RETRY["Retry + backoff\n(429/502/503/504)"]
+        CACHE["TTL cache\n(namespaces, types)"]
+        RATE["Rate limiter\n(100 / 60s)"]
+        SSE["SSE stream\n+ polling fallback"]
+    end
+
+    SERVER[("i3X REST API")]
+
+    BROWSE --> CONFIG
+    READ --> CONFIG
+    WRITE --> CONFIG
+    HISTORY --> CONFIG
+    SUB --> CONFIG
+
+    CONFIG --> CLIENT
+    CLIENT -- "axios · HTTPS" --> SERVER
+```
+
+### Request flow (example: read a value)
+
+```mermaid
+sequenceDiagram
+    participant F as Flow (msg)
+    participant N as i3x-read
+    participant C as I3XClient
+    participant S as i3X Server
+
+    F->>N: msg.elementIds
+    N->>C: getValues(ids, maxDepth)
+    C->>C: rate-limit check / cache lookup
+    C->>S: POST /objects/value
+    alt 429 / 5xx
+        S-->>C: error + Retry-After
+        C->>C: exponential backoff
+        C->>S: retry (max 3)
+    end
+    S-->>C: VQT values
+    C-->>N: result
+    N-->>F: msg.payload
+```
 
 ## Installation
 
@@ -196,9 +300,17 @@ npm run test:unit
 # Integration tests only (requires network access to demo server)
 npm run test:integration
 
+# Unit tests with coverage report
+npm run test:coverage
+
+# Lint (ESLint over lib/, nodes/, test/)
+npm run lint
+
 # Run all tests in Docker
 npm run test:docker
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
 
 ## Docker
 
@@ -229,7 +341,7 @@ node-red
 
 ## References
 
-- [i3X API Documentation](https://api.i3x.dev/v0/docs)
+- [i3X API Documentation](https://api.i3x.dev/v1/docs)
 - [i3X Client Developer Guide](https://www.i3x.dev/sdk/category/client-developers)
 - [i3X Specification & RFC](https://github.com/cesmii/i3X)
 - [i3X SDK Documentation](https://www.i3x.dev/sdk)

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.0.6 (2026-06-14)
+
+Tooling and developer-experience release. No functional changes to node
+behaviour since 0.0.5; the package remains feature-complete against the
+**i3X API 1.0 Release** specification (finalized 2026-06-09).
+
+### Added
+
+- TypeScript type definitions for the shared client (`lib/i3x-client.d.ts`,
+  exposed via the package `types` field)
+- ESLint flat config and `npm run lint` / `lint:fix` scripts; CI now runs a
+  lint job before the test matrix
+- Coverage tooling via c8 (`npm run test:coverage`)
+- `CONTRIBUTING.md`, GitHub issue forms, and a pull-request template
+- README badges and an architecture section with schematic diagrams
+
+### Changed
+
+- **Minimum Node.js raised to 18** (`engines.node` was incorrectly `>=14`;
+  CI and `axios ^1.15` already required 18+)
+- Documentation links now consistently point at the 1.0 (`/v1`) API docs
+
 ## 0.0.5 (2026-06-12)
 
 Migration to the **i3X API 1.0 Release** specification (finalized 2026-06-09). See the

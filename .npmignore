@@ -1,6 +1,8 @@
 test/
 coverage/
 .nyc_output/
+eslint.config.js
+CONTRIBUTING.md
 .git/
 .github/
 .dockerignore

@@ -40,8 +40,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      # Nur Unit-Tests (offline) als Release-Gate – die Integrationstests
+      # brauchen Netzwerkzugriff auf den Demo-Server und sollen den Publish
+      # nicht blockieren.
+      - name: Run unit tests
+        run: npm run test:unit
 
       # Provenance wird bei Trusted Publishing automatisch erzeugt.
       - name: Publish

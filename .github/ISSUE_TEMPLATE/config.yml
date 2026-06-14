@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: i3X specification & docs
+    url: https://www.i3x.dev
+    about: Questions about the i3X API specification itself.
+  - name: CESMII
+    url: https://www.cesmii.org
+    about: Background on the Smart Manufacturing Innovation Institute behind i3X.
