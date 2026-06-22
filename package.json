@@ -42,7 +42,7 @@
     "nock": "^14.0.0",
     "node-red": "^4.1.11",
     "node-red-node-test-helper": "^0.3.6",
-    "sinon": "^21.0.0"
+    "sinon": "^22.0.0"
   },
   "node-red": {
     "version": ">=2.0.0",
