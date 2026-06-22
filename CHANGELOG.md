@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.0.8 (2026-06-22)
+
+Bug-fix release.
+
+### Fixed
+
+- **History queries failed against 1.0 servers when no end time was set** –
+  `POST /objects/history` now requires `endTime` (live servers reject an omitted
+  value with `400 "endTime: Field required"`). `readHistory()` (and therefore the
+  `i3x-history` node with a blank **End Time**) now defaults an omitted `endTime`
+  to the current time. Fixes the failing live-API integration test.
+
 ## 0.0.7 (2026-06-22)
 
 Editor UX improvements, a bundled reference mock server, and local Docker

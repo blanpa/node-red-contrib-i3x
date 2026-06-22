@@ -542,10 +542,12 @@ describe("i3x Node-RED Nodes", function () {
             nock(BASE).get("/namespaces").reply(200, []);
             nock(BASE)
                 .post("/objects/history", (body) => {
+                    // endTime is required by 1.0 servers; the client fills an
+                    // omitted endTime (node config left blank) with the current time.
                     return (
                         body.elementIds[0] === "obj1" &&
                         body.startTime &&
-                        !body.endTime
+                        typeof body.endTime === "string"
                     );
                 })
                 .reply(200, data);

@@ -226,7 +226,7 @@ describe("I3XClient", function () {
         it("should POST /objects/history", async function () {
             const data = { obj1: { data: [] } };
             nock(BASE)
-                .post("/objects/history", { elementIds: ["obj1"] })
+                .post("/objects/history", (b) => JSON.stringify(b.elementIds) === '["obj1"]' && typeof b.endTime === "string")
                 .reply(200, data);
 
             client = new I3XClient({ baseUrl: BASE });
@@ -249,6 +249,18 @@ describe("I3XClient", function () {
                 endTime: "2025-01-02T00:00:00Z",
             });
             expect(result).to.deep.equal({});
+        });
+
+        it("should default endTime to now when omitted (1.0 requires it)", async function () {
+            let sent;
+            nock(BASE)
+                .post("/objects/history", (b) => { sent = b; return true; })
+                .reply(200, {});
+
+            client = new I3XClient({ baseUrl: BASE });
+            await client.readHistory(["obj1"], { startTime: "2025-01-01T00:00:00Z" });
+            expect(sent.endTime).to.be.a("string");
+            expect(Number.isNaN(Date.parse(sent.endTime))).to.equal(false);
         });
     });
 
@@ -853,7 +865,7 @@ describe("I3XClient", function () {
         it("should set _partial flag on 206 response", async function () {
             const data = { obj1: { data: [{ value: 1 }] } };
             nock(BASE)
-                .post("/objects/history", { elementIds: ["obj1"] })
+                .post("/objects/history", (b) => JSON.stringify(b.elementIds) === '["obj1"]' && typeof b.endTime === "string")
                 .reply(206, data);
 
             client = new I3XClient({ baseUrl: BASE });
@@ -865,7 +877,7 @@ describe("I3XClient", function () {
         it("should not set _partial flag on 200 response", async function () {
             const data = { obj1: { data: [{ value: 1 }] } };
             nock(BASE)
-                .post("/objects/history", { elementIds: ["obj1"] })
+                .post("/objects/history", (b) => JSON.stringify(b.elementIds) === '["obj1"]' && typeof b.endTime === "string")
                 .reply(200, data);
 
             client = new I3XClient({ baseUrl: BASE });
@@ -935,7 +947,7 @@ describe("I3XClient", function () {
         it("should POST /objects/history with a single elementId", async function () {
             const data = [{ elementId: "obj1", values: [{ value: 42, timestamp: "2025-01-01T00:00:00Z" }] }];
             nock(BASE)
-                .post("/objects/history", { elementIds: ["obj1"] })
+                .post("/objects/history", (b) => JSON.stringify(b.elementIds) === '["obj1"]' && typeof b.endTime === "string")
                 .reply(200, data);
 
             client = new I3XClient({ baseUrl: BASE });
@@ -962,7 +974,7 @@ describe("I3XClient", function () {
 
         it("should set _partial flag on 206 response", async function () {
             const data = [{ elementId: "obj1", values: [{ value: 1 }] }];
-            nock(BASE).post("/objects/history", { elementIds: ["obj1"] }).reply(206, data);
+            nock(BASE).post("/objects/history", (b) => JSON.stringify(b.elementIds) === '["obj1"]' && typeof b.endTime === "string").reply(206, data);
 
             client = new I3XClient({ baseUrl: BASE });
             const result = await client.getHistory("obj1");
