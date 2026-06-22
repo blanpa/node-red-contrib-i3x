@@ -51,6 +51,10 @@
         </button>
         <span id="i3x-test-result" style="margin-left:8px;font-size:12px"></span>
     </div>
+    <div class="form-row" id="i3x-server-info-row" style="display:none">
+        <label>&nbsp;</label>
+        <div id="i3x-server-info" style="flex:1"></div>
+    </div>
 </script>
 
 <script type="text/html" data-help-name="i3x-server">
@@ -102,6 +106,55 @@
             toggleAuth();
 
             var nodeId = this.id;
+
+            function escHtml(t) { return $("<span>").text(t == null ? "" : t).html(); }
+
+            function capBadge(label, on) {
+                var color = on ? "#22c55e" : "#9ca3af";
+                var icon = on ? "fa-check" : "fa-minus";
+                var title = on ? "supported" : "not supported";
+                return '<span title="' + title + '" style="display:inline-block;margin:2px 4px 2px 0;padding:1px 7px;'
+                    + 'border:1px solid ' + color + ';border-radius:10px;font-size:11px;color:' + color + '">'
+                    + '<i class="fa ' + icon + '"></i> ' + escHtml(label) + '</span>';
+            }
+
+            function renderInfo(info) {
+                var $row = $("#i3x-server-info-row");
+                var $box = $("#i3x-server-info");
+                if (!info || typeof info !== "object") { $row.hide(); return; }
+                var caps = info.capabilities || {};
+                var q = caps.query || {}, u = caps.update || {}, s = caps.subscribe || {};
+                var head = '<div style="font-size:12px;margin-bottom:4px">'
+                    + '<i class="fa fa-info-circle"></i> '
+                    + (info.serverName ? '<b>' + escHtml(info.serverName) + '</b> ' : '')
+                    + '<span style="color:var(--red-ui-secondary-text-color,#888)">spec '
+                    + escHtml(info.specVersion || "?")
+                    + (info.serverVersion ? ' · server ' + escHtml(info.serverVersion) : '')
+                    + '</span></div>';
+                var badges = '<div>'
+                    + capBadge("SSE stream", !!s.stream)
+                    + capBadge("history query", !!q.history)
+                    + capBadge("write current", !!u.current)
+                    + capBadge("write history", !!u.history)
+                    + '</div>';
+                var hint = !s.stream
+                    ? '<div style="font-size:11px;color:#d4a017;margin-top:4px">'
+                        + '<i class="fa fa-warning"></i> No SSE – subscribe nodes will use polling (sync).</div>'
+                    : '';
+                $box.html(head + badges + hint);
+                $row.show();
+            }
+
+            function loadInfo() {
+                if (!nodeId) return;
+                $.getJSON("i3x-server/" + encodeURIComponent(nodeId) + "/info")
+                    .done(renderInfo)
+                    .fail(function () { $("#i3x-server-info-row").hide(); });
+            }
+
+            // Auto-load capabilities when (re)opening an already-deployed server
+            loadInfo();
+
             $("#i3x-test-connection").on("click", function () {
                 var $btn = $(this);
                 var $result = $("#i3x-test-result");
@@ -115,6 +168,7 @@
                     .done(function (data) {
                         if (data.connected) {
                             $result.html('<span style="color:#22c55e"><i class="fa fa-check"></i> Connected</span>');
+                            loadInfo();
                         } else {
                             $result.html('<span style="color:#ef4444"><i class="fa fa-times"></i> Disconnected</span>');
                         }
@@ -629,6 +683,10 @@
                     return !!selected[parentEid];
                 }
 
+                // Tracks in-flight lazy loads so "Expand all" knows when the
+                // tree has fully settled (see the $expandAll handler).
+                var pendingLoads = 0;
+
                 // ── Load children (related objects) ──
                 function loadChildren(parentEid, $container, depth, parentTypeName) {
                     var pad = 10 + depth * 20;
@@ -637,6 +695,7 @@
                         return;
                     }
                     $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:' + pad + 'px">' + spinner() + 'Loading...</div>');
+                    pendingLoads++;
                     $.getJSON("i3x-server/" + encodeURIComponent(sid()) + "/browse/related/" + encodeURIComponent(parentEid))
                         .done(function (items) {
                             $container.empty();
@@ -666,7 +725,8 @@
                         })
                         .fail(function () {
                             $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:' + pad + 'px;color:var(--i3x-danger)"><i class="fa fa-exclamation-circle"></i> Failed to load</div>');
-                        });
+                        })
+                        .always(function () { pendingLoads = Math.max(0, pendingLoads - 1); });
                 }
 
                 // ── Load top-level: object types ──
@@ -733,6 +793,7 @@
                 // ── Load objects for a type ──
                 function loadObjects(typeId, typeName, $container, $countSpan) {
                     $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:30px">' + spinner() + 'Loading...</div>');
+                    pendingLoads++;
                     $.getJSON("i3x-server/" + encodeURIComponent(sid()) + "/browse/objects", { typeId: typeId })
                         .done(function (objects) {
                             $container.empty();
@@ -755,7 +816,8 @@
                         })
                         .fail(function () {
                             $container.html('<div class="i3x-browser-msg i3x-msg-inline" style="padding-left:30px;color:var(--i3x-danger)"><i class="fa fa-exclamation-circle"></i> Failed to load</div>');
-                        });
+                        })
+                        .always(function () { pendingLoads = Math.max(0, pendingLoads - 1); });
                 }
 
                 // ── 5. Server-side search with debounce ──
@@ -855,10 +917,46 @@
                     $search.val("").trigger("input").focus();
                 });
 
-                // expand all loaded nodes
+                // expand all – the tree is lazy-loaded, so we must trigger each
+                // node's loader (not just toggle CSS). Click every still-closed
+                // toggle, wait for async children to render, then repeat until no
+                // closed expandable nodes remain (bounded for safety).
+                var expanding = false;
                 $expandAll.on("click", function () {
-                    $tree.find(".i3x-bnode-children").addClass("open");
-                    $tree.find(".i3x-bnode-toggle .fa").removeClass("fa-caret-right").addClass("fa-caret-down");
+                    if (expanding || searchMode) return;
+                    expanding = true;
+                    $expandAll.prop("disabled", true).find(".fa").addClass("fa-spin");
+                    var iterations = 0, MAX_ITERS = 60;
+                    function closedRows() {
+                        return $tree.find(".i3x-bnode").children(".i3x-bnode-row").filter(function () {
+                            var $kids = $(this).siblings(".i3x-bnode-children");
+                            return $kids.length && !$kids.hasClass("open");
+                        });
+                    }
+                    function finish() {
+                        expanding = false;
+                        $expandAll.prop("disabled", false).find(".fa").removeClass("fa-spin");
+                        updateBreadcrumb([]);
+                    }
+                    function step() {
+                        if (iterations++ >= MAX_ITERS) { finish(); return; }
+                        var $rows = closedRows();
+                        if ($rows.length) {
+                            // Opening a node marks it .open immediately and kicks off
+                            // an async child load; click them all, then re-scan.
+                            $rows.each(function () {
+                                $(this).find(".i3x-bnode-toggle").first().trigger("click");
+                            });
+                            setTimeout(step, 250);
+                        } else if (pendingLoads > 0) {
+                            // No closed nodes yet, but children are still loading –
+                            // wait for them to render before deciding we're done.
+                            setTimeout(step, 250);
+                        } else {
+                            finish();
+                        }
+                    }
+                    step();
                 });
 
                 // collapse all

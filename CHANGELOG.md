@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.0.7 (2026-06-22)
+
+Editor UX improvements, a bundled reference mock server, and local Docker
+tooling. No client API changes; still feature-complete against the **i3X API
+1.0 Release**.
+
+### Added
+
+- **Capability banner in the server config dialog** – the "Test Connection"
+  area now surfaces `GET /info`: server name, spec/server version, and the
+  reported capabilities (`subscribe.stream`, `query.history`,
+  `update.current`, `update.history`) as badges. When SSE streaming is not
+  supported it hints that subscribe nodes will fall back to polling. Loaded
+  automatically when reopening a deployed server. New admin endpoint
+  `GET /i3x-server/:id/info`.
+- **Dropdown pickers in the browse node** – `Namespace`, `Type ID`, and
+  `Rel. Type` are now populated from the live server instead of free-text
+  entry, each with a refresh button. New admin endpoints
+  `GET /i3x-server/:id/browse/namespaces` and `.../browse/relationshiptypes`.
+  Saved values are preserved even when the server is undeployed or the value
+  is no longer known, and `msg`-based runtime overrides are unaffected.
+- **Bundled i3X reference mock server** (`mock-server/`, dev-only, not
+  published) – a dependency-free in-memory implementation of the full 1.0
+  endpoint surface with an ISA-95 sample model, live time-varying values,
+  history generation, and subscriptions over both SSE and sync polling
+  (`clientId` enforced; `I3X_STREAM=off` makes it poll-only via 501). New
+  Docker Compose services `i3x-mock` and `node-red-mock` plus a demo flow
+  (`examples/i3x-mock-demo.json`) bring up a turnkey local environment.
+  The mock now also sends permissive CORS headers (and answers `OPTIONS`
+  preflight) so browser-based i3X clients can call it directly.
+- **Dockerized i3X Explorer GUI** (`i3x-explorer/`, dev-only, not published) –
+  a Docker Compose service `i3x-explorer` that builds the official
+  [i3X Explorer](https://github.com/ace-technologies-inc/i3X-Explorer)
+  web bundle and serves it via nginx, pre-pointed at the bundled mock
+  (`http://localhost:18810/v1`). Browse a full i3X server in a standalone GUI
+  at <http://localhost:18820> — no Node-RED, no Electron.
+
+### Fixed
+
+- **"Expand all" in the browser widget did nothing on an unexpanded tree** –
+  the tree is lazy-loaded, but the button only toggled CSS without triggering
+  the per-node loaders. It now recursively opens every node and waits for the
+  async child loads to settle (tracked via an in-flight load counter) before
+  finishing, so the whole hierarchy is fetched and expanded.
+
 ## 0.0.6 (2026-06-14)
 
 Tooling and developer-experience release. No functional changes to node

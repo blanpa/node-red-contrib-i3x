@@ -26,15 +26,18 @@
     </div>
     <div class="form-row i3x-browse-typeId">
         <label for="node-input-typeId"><i class="fa fa-filter"></i> Type ID</label>
-        <input type="text" id="node-input-typeId" placeholder="optional – filter objects by type">
+        <select id="node-input-typeId" style="width:70%"><option value="">(any)</option></select>
+        <i class="fa fa-refresh i3x-pick-refresh" data-target="typeId" title="Reload from server" style="cursor:pointer;margin-left:6px"></i>
     </div>
     <div class="form-row i3x-browse-ns">
         <label for="node-input-namespaceUri"><i class="fa fa-folder-o"></i> Namespace</label>
-        <input type="text" id="node-input-namespaceUri" placeholder="optional – filter by namespace URI">
+        <select id="node-input-namespaceUri" style="width:70%"><option value="">(any)</option></select>
+        <i class="fa fa-refresh i3x-pick-refresh" data-target="namespaceUri" title="Reload from server" style="cursor:pointer;margin-left:6px"></i>
     </div>
     <div class="form-row i3x-browse-rel">
         <label for="node-input-relationshipType"><i class="fa fa-link"></i> Rel. Type</label>
-        <input type="text" id="node-input-relationshipType" placeholder="optional – filter by relationship type">
+        <select id="node-input-relationshipType" style="width:70%"><option value="">(any)</option></select>
+        <i class="fa fa-refresh i3x-pick-refresh" data-target="relationshipType" title="Reload from server" style="cursor:pointer;margin-left:6px"></i>
     </div>
     <div class="form-row i3x-browse-meta">
         <label for="node-input-includeMetadata"><i class="fa fa-info-circle"></i> Metadata</label>
@@ -105,6 +108,77 @@
             }
             target.on("change", toggle);
             toggle();
+
+            // ── Dropdown pickers (namespace / type / relationship type) ──
+            // Saved values come from the node properties; the <select> options
+            // are loaded from the deployed server. Preserve the stored value
+            // even if the server is unreachable or the value is no longer known.
+            var saved = {
+                typeId: this.typeId || "",
+                namespaceUri: this.namespaceUri || "",
+                relationshipType: this.relationshipType || "",
+            };
+
+            var PICKERS = {
+                typeId: { path: "browse/objecttypes", val: ["elementId", "id"], label: ["displayName"] },
+                namespaceUri: { path: "browse/namespaces", val: ["uri"], label: ["displayName"] },
+                relationshipType: { path: "browse/relationshiptypes", val: ["elementId", "id"], label: ["displayName"] },
+            };
+
+            function pick(obj, keys) {
+                for (var i = 0; i < keys.length; i++) {
+                    if (obj && obj[keys[i]] != null && obj[keys[i]] !== "") return obj[keys[i]];
+                }
+                return "";
+            }
+
+            function ensureOption($sel, value, label) {
+                if (!value) return;
+                if ($sel.find('option[value="' + $.escapeSelector(value) + '"]').length === 0) {
+                    $sel.append($("<option>").attr("value", value).text(label || value));
+                }
+            }
+
+            // Seed each select with its saved value so it stays selected pre-load
+            Object.keys(PICKERS).forEach(function (field) {
+                var $sel = $("#node-input-" + field);
+                ensureOption($sel, saved[field], saved[field]);
+                $sel.val(saved[field]);
+            });
+
+            function loadPicker(field) {
+                var cfg = PICKERS[field];
+                var sid = $("#node-input-server").val();
+                var $sel = $("#node-input-" + field);
+                if (!sid || sid === "_ADD_") return;
+                var current = $sel.val() || saved[field];
+                $.getJSON("i3x-server/" + encodeURIComponent(sid) + "/" + cfg.path)
+                    .done(function (items) {
+                        $sel.empty().append($("<option>").attr("value", "").text("(any)"));
+                        (Array.isArray(items) ? items : []).forEach(function (it) {
+                            var v = pick(it, cfg.val);
+                            if (!v) return;
+                            $sel.append($("<option>").attr("value", v).text(pick(it, cfg.label) || v));
+                        });
+                        ensureOption($sel, current, current);
+                        $sel.val(current);
+                    })
+                    .fail(function () {
+                        // keep the saved value selectable; server not deployed/reachable
+                        ensureOption($sel, current, current);
+                        $sel.val(current);
+                    });
+            }
+
+            function loadAllPickers() {
+                Object.keys(PICKERS).forEach(loadPicker);
+            }
+
+            loadAllPickers();
+            $("#node-input-server").on("change", loadAllPickers);
+            $(".i3x-pick-refresh").on("click", function () {
+                loadPicker($(this).data("target"));
+            });
 
             if (window.I3XBrowser) {
                 this._browser = I3XBrowser.create({

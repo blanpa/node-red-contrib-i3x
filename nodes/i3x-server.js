@@ -84,6 +84,34 @@ module.exports = function (RED) {
 
     // ── Admin browse endpoints for editor treeview ─────────────────────
 
+    RED.httpAdmin.get("/i3x-server/:id/browse/namespaces", async function (req, res) {
+        const node = RED.nodes.getNode(req.params.id);
+        if (!node || !node.client) {
+            return res.status(404).json({ error: "Server not found – please deploy first" });
+        }
+        try {
+            const result = await node.client.getNamespaces();
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    RED.httpAdmin.get("/i3x-server/:id/browse/relationshiptypes", async function (req, res) {
+        const node = RED.nodes.getNode(req.params.id);
+        if (!node || !node.client) {
+            return res.status(404).json({ error: "Server not found – please deploy first" });
+        }
+        try {
+            const result = await node.client.getRelationshipTypes({
+                namespaceUri: req.query.namespaceUri || undefined,
+            });
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     RED.httpAdmin.get("/i3x-server/:id/browse/objecttypes", async function (req, res) {
         const node = RED.nodes.getNode(req.params.id);
         if (!node || !node.client) {
@@ -197,5 +225,19 @@ module.exports = function (RED) {
             return res.status(404).json({ connected: false, error: "Node not found" });
         }
         res.json({ connected: !!node.connected });
+    });
+
+    // ── Server info / capabilities (for the editor capability banner) ──
+    RED.httpAdmin.get("/i3x-server/:id/info", async function (req, res) {
+        const node = RED.nodes.getNode(req.params.id);
+        if (!node || !node.client) {
+            return res.status(404).json({ error: "Server not found – please deploy first" });
+        }
+        try {
+            const result = await node.client.getInfo();
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
 };

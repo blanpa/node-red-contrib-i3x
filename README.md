@@ -324,6 +324,31 @@ docker compose up node-red
 docker compose run --rm test
 ```
 
+### Local development environment (mock server + GUIs)
+
+For a turnkey local setup that needs no external i3X server, the repo bundles a
+**reference mock server** plus two front-ends wired to it:
+
+```bash
+docker compose up -d i3x-mock node-red-mock i3x-explorer
+```
+
+| Service         | URL                              | What it is |
+| --------------- | -------------------------------- | ---------- |
+| `i3x-mock`      | <http://localhost:18810/info>    | Dependency-free, in-memory **i3X 1.0** reference server (ISA-95 sample model, live values, history, subscriptions over SSE **and** sync polling). See [`mock-server/`](mock-server/). |
+| `node-red-mock` | <http://localhost:18881>         | Node-RED with these nodes + a demo flow ([`examples/i3x-mock-demo.json`](examples/i3x-mock-demo.json)) pointed at the mock. |
+| `i3x-explorer`  | <http://localhost:18820>         | The **official i3X Explorer** GUI, served standalone via nginx and pointed at the mock. |
+
+> **Third-party notice:** `i3x-explorer` is *not* part of this package. It builds
+> and serves the **official i3X Explorer** from
+> [ace-technologies-inc/i3X-Explorer](https://github.com/ace-technologies-inc/i3X-Explorer)
+> (by ACE Technologies / CESMII, MIT-licensed). This repo only provides the Docker
+> packaging — the application source is cloned from upstream at build time, not
+> vendored here. See [`i3x-explorer/README.md`](i3x-explorer/README.md).
+
+The mock server and the Explorer packaging are development tooling only and are
+excluded from the published npm package.
+
 ## Development
 
 ```bash
