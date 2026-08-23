@@ -5,11 +5,11 @@
     </div>
     <div class="form-row">
         <label for="node-config-input-baseUrl"><i class="fa fa-globe"></i> Base URL</label>
-        <input type="text" id="node-config-input-baseUrl" placeholder="https://i3x.cesmii.net">
+        <input type="text" id="node-config-input-baseUrl" placeholder="https://api.i3x.dev">
     </div>
     <div class="form-row">
         <label for="node-config-input-apiVersion"><i class="fa fa-code-fork"></i> API Version</label>
-        <input type="text" id="node-config-input-apiVersion" placeholder="v0 (leave empty for current)">
+        <input type="text" id="node-config-input-apiVersion" placeholder="v1 (leave empty if already in Base URL)">
     </div>
     <div class="form-row">
         <label for="node-config-input-authType"><i class="fa fa-lock"></i> Auth Type</label>
@@ -62,9 +62,11 @@
     <h3>Properties</h3>
     <dl class="message-properties">
         <dt>Base URL <span class="property-type">string</span></dt>
-        <dd>The root URL of the i3X API server, e.g. <code>https://i3x.cesmii.net</code>.</dd>
+        <dd>The root URL of the i3X API server, e.g. <code>https://api.i3x.dev</code>.</dd>
         <dt>API Version <span class="property-type">string</span></dt>
-        <dd>Optional path prefix for versioned endpoints (e.g. <code>v0</code>). Leave empty for current default.</dd>
+        <dd>Optional path prefix for versioned endpoints. The i3X 1.0 spec requires a
+            versioned endpoint, so the effective URL must end in <code>/v1</code> – either put it
+            here (e.g. <code>v1</code>) or include it in the Base URL.</dd>
         <dt>Auth Type <span class="property-type">select</span></dt>
         <dd>Authentication method: None, Basic Auth, Bearer Token, or API Key.</dd>
         <dt>TLS <span class="property-type">tls-config</span></dt>

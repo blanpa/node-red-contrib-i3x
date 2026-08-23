@@ -3,7 +3,7 @@ services:
     build: .
     command: npm test
     environment:
-      - I3X_BASE_URL=https://i3x.cesmii.net
+      - I3X_BASE_URL=https://api.i3x.dev/v1
 
   test-unit:
     build: .
@@ -13,7 +13,7 @@ services:
     build: .
     command: npm run test:integration
     environment:
-      - I3X_BASE_URL=https://i3x.cesmii.net
+      - I3X_BASE_URL=https://api.i3x.dev/v1
 
   node-red:
     image: nodered/node-red:latest
@@ -29,7 +29,7 @@ services:
 
   # ── Bundled i3X reference mock server (1.0 Release) ──────────────────
   i3x-mock:
-    image: node:18-alpine
+    image: node:22-alpine
     working_dir: /srv
     command: node server.js
     volumes:

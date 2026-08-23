@@ -136,8 +136,8 @@ Shared connection configuration used by all other nodes.
 
 | Property    | Description                                                  |
 | ----------- | ------------------------------------------------------------ |
-| Base URL    | Root URL of the i3X API server (e.g. `https://i3x.cesmii.net`) |
-| API Version | Optional path prefix (e.g. `v0`)                             |
+| Base URL    | Root URL of the i3X API server (e.g. `https://api.i3x.dev`)  |
+| API Version | Path prefix for the versioned endpoint (e.g. `v1`) – may be omitted if the Base URL already ends in `/v1` |
 | Auth Type   | `none`, `basic`, `bearer`, or `apikey`                       |
 | TLS         | Optional TLS configuration (Node-RED TLS Config Node)        |
 | Timeout     | HTTP timeout in milliseconds (default 10 000)                |
@@ -186,6 +186,8 @@ Query historical time-series data.
 - **Input:** `msg.elementIds`, `msg.startTime`, `msg.endTime`
 - **Output:** `msg.payload` – historical data from `POST /objects/history`
 - **Time formats:** ISO 8601 (`2025-01-01T00:00:00Z`) or relative (`-1h`, `-7d`, `-30m`, `-2w`)
+- **Defaults:** the 1.0 spec requires both ends of the range, so a blank **End Time**
+  defaults to now and a blank **Start Time** to one hour before it
 
 ### i3x-subscribe
 
@@ -209,6 +211,8 @@ The shared HTTP client (`lib/i3x-client.js`) implements all [i3X Client Develope
 | **Input Sanitization** | Allowlist validation on write payloads to prevent injection of unexpected fields |
 | **TLS Certificate Validation** | `rejectUnauthorized: true` by default; overridable via TLS config node |
 | **SSE Reconnection** | Automatic reconnection with exponential backoff (up to 5 attempts, max 30s delay) |
+| **Spec-compliant SSE Framing** | Handles LF/CRLF/CR line endings, multi-line `data:` fields and multi-byte characters split across chunks |
+| **Queue-overflow Detection** | A `206` on `/subscriptions/sync` (server dropped updates) is surfaced as a node warning |
 | **SSE → Polling Fallback** | Automatic fallback to polling if SSE stream setup fails |
 | **Subscription Cleanup** | Subscriptions are deleted server-side on node stop/re-deploy |
 
@@ -257,8 +261,8 @@ server config node), which scopes subscriptions per client.
         "id": "server1",
         "type": "i3x-server",
         "name": "CESMII Demo",
-        "baseUrl": "https://i3x.cesmii.net",
-        "apiVersion": "",
+        "baseUrl": "https://api.i3x.dev",
+        "apiVersion": "v1",
         "authType": "none",
         "timeout": "10000"
     },
@@ -303,6 +307,9 @@ npm run test:integration
 # Unit tests with coverage report
 npm run test:coverage
 
+# Official CESMII conformance suite against the bundled reference mock
+npm run test:conformance
+
 # Lint (ESLint over lib/, nodes/, test/)
 npm run lint
 
@@ -335,7 +342,7 @@ docker compose up -d i3x-mock node-red-mock i3x-explorer
 
 | Service         | URL                              | What it is |
 | --------------- | -------------------------------- | ---------- |
-| `i3x-mock`      | <http://localhost:18810/info>    | Dependency-free, in-memory **i3X 1.0** reference server (ISA-95 sample model, live values, history, subscriptions over SSE **and** sync polling). See [`mock-server/`](mock-server/). |
+| `i3x-mock`      | <http://localhost:18810/info>    | Dependency-free, in-memory **i3X 1.0** reference server (ISA-95 sample model, live values, history, subscriptions over SSE **and** sync polling). Verified **Full 1.0 Compliance** against the official CESMII conformance suite. See [`mock-server/`](mock-server/). |
 | `node-red-mock` | <http://localhost:18881>         | Node-RED with these nodes + a demo flow ([`examples/i3x-mock-demo.json`](examples/i3x-mock-demo.json)) pointed at the mock. |
 | `i3x-explorer`  | <http://localhost:18820>         | The **official i3X Explorer** GUI, served standalone via nginx and pointed at the mock. |
 
@@ -344,7 +351,8 @@ docker compose up -d i3x-mock node-red-mock i3x-explorer
 > [ace-technologies-inc/i3X-Explorer](https://github.com/ace-technologies-inc/i3X-Explorer)
 > (by ACE Technologies / CESMII, MIT-licensed). This repo only provides the Docker
 > packaging — the application source is cloned from upstream at build time, not
-> vendored here. See [`i3x-explorer/README.md`](i3x-explorer/README.md).
+> vendored here, pinned to a commit for reproducible builds (override with
+> `--build-arg EXPLORER_REF=main`). See [`i3x-explorer/README.md`](i3x-explorer/README.md).
 
 The mock server and the Explorer packaging are development tooling only and are
 excluded from the published npm package.

@@ -6,3 +6,6 @@ Thumbs.db
 coverage/
 .nyc_output/
 *.tgz
+
+# Conformance suite checkout (fetched on demand by mock-server/run-conformance.sh)
+.conformance/

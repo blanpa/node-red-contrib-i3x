@@ -8,25 +8,40 @@
  *
  *   - Spec response envelope: SuccessResponse {success,result} /
  *     BulkResponse {success,results:[{success,elementId,result,responseDetail}]}
+ *     Bulk results mirror the request one-to-one, in order, with per-item 404s.
  *   - Error envelope: {success:false, responseDetail:{title,status,detail}}
  *   - ISA-95-style sample model (Enterprise → Site → Area → Line → Machine → Sensor)
- *   - Live, time-varying sensor values (sine / enum / boolean generators)
- *   - Historical series generation between start/end
- *   - Subscriptions with SSE streaming AND sync polling (clientId enforced)
+ *   - Bidirectional relationship graph; every relationship type has a registered,
+ *     symmetric reverseOf, and the hierarchy is traversable via /objects/related
+ *   - Live, time-varying sensor values (sine / enum / boolean generators) whose
+ *     values validate against their Object Type's JSON Schema
+ *   - Historical series generation between start/end (startTime and endTime are
+ *     required, as in the spec), with composition support via maxDepth
+ *   - Subscriptions with SSE streaming AND sync polling; subscriptions are
+ *     scoped to their clientId (another client sees 404)
+ *   - gzip content encoding when the client asks for it
  *   - GET /info advertising capabilities (toggle SSE via I3X_STREAM=off → 501)
  *
+ * Verified against the official i3X 1.0 Conformance Test Suite
+ * (https://github.com/cesmii/i3X/tree/1.0/conformance-tests).
+ *
  * Run: node server.js        (PORT env, default 8080)
- * No external dependencies – Node 18+ built-in http only.
+ * No external dependencies – Node built-in http/zlib only.
  */
 "use strict";
 
 const http = require("http");
+const zlib = require("zlib");
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 const STREAM_ENABLED = (process.env.I3X_STREAM || "on").toLowerCase() !== "off";
 const SPEC_VERSION = "1.0";
 const SERVER_VERSION = "i3x-mock 1.0.0";
 const SERVER_NAME = "i3X Reference Mock (Acme Manufacturing)";
+
+// RFC 3339, UTC only – the Implementation Guide requires timestamps in UTC
+// with no timezone offset.
+const UTC_TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 // ── Information model ──────────────────────────────────────────────────
 
@@ -40,33 +55,74 @@ const namespaces = [
     { uri: NS_SAMPLE, displayName: "i3X Sample Factory" },
 ];
 
+const MACHINE_STATES = ["Running", "Idle", "Cleaning", "Fault"];
+
+/**
+ * Object type schemas describe the shape of an Object's *value*. Container
+ * types are compositions and describe their component tree; sensor types are
+ * scalar and must match the value their generator produces (see QRY-03).
+ */
 const objectTypes = [
-    mkType("type-enterprise", "Enterprise", NS_ISA95),
-    mkType("type-site", "Site", NS_ISA95),
-    mkType("type-area", "Area", NS_ISA95),
-    mkType("type-line", "ProductionLine", NS_ISA95),
-    mkType("type-machine", "Machine", NS_SAMPLE),
-    mkType("type-tank", "Tank", NS_SAMPLE),
-    mkType("type-sensor", "Sensor", NS_SAMPLE),
+    mkType("type-enterprise", "Enterprise", NS_ISA95, {
+        type: "object",
+        properties: { sites: { type: "array", items: { type: "string" } } },
+    }),
+    mkType("type-site", "Site", NS_ISA95, {
+        type: "object",
+        properties: { areas: { type: "array", items: { type: "string" } } },
+    }),
+    mkType("type-area", "Area", NS_ISA95, {
+        type: "object",
+        properties: { equipment: { type: "array", items: { type: "string" } } },
+    }),
+    mkType("type-line", "ProductionLine", NS_ISA95, {
+        type: "object",
+        properties: { machines: { type: "array", items: { type: "string" } } },
+    }),
+    mkType("type-machine", "Machine", NS_SAMPLE, {
+        type: "object",
+        properties: {
+            Temperature: { type: "number" },
+            Speed: { type: "number" },
+            State: { type: "string", enum: MACHINE_STATES },
+        },
+    }),
+    mkType("type-tank", "Tank", NS_SAMPLE, {
+        type: "object",
+        properties: { Level: { type: "number" }, pH: { type: "number" } },
+    }),
+    mkType("type-sensor-analog", "AnalogSensor", NS_SAMPLE, { type: "number" }),
+    mkType("type-sensor-state", "StateSensor", NS_SAMPLE, { type: "string", enum: MACHINE_STATES }),
+    mkType("type-sensor-boolean", "BooleanSensor", NS_SAMPLE, { type: "boolean" }),
 ];
 
-function mkType(elementId, displayName, namespaceUri) {
+function mkType(elementId, displayName, namespaceUri, schema) {
     return {
         elementId,
         displayName,
         namespaceUri,
         sourceTypeId: elementId,
         version: "1.0",
-        schema: { type: "object" },
+        schema,
         related: null,
     };
 }
 
+/**
+ * Every relationship type declares a reverseOf that is itself registered here,
+ * and the pair is symmetric (EXP-10). Edges are stored bidirectionally so the
+ * graph is traversable from either end (EXP-20).
+ */
 const relationshipTypes = [
-    { elementId: "rel-contains", displayName: "Contains", namespaceUri: NS_ISA95, relationshipId: "rel-contains", reverseOf: "isContainedIn" },
-    { elementId: "rel-hasChild", displayName: "HasChild", namespaceUri: NS_SAMPLE, relationshipId: "rel-hasChild", reverseOf: "hasParent" },
-    { elementId: "rel-feeds", displayName: "Feeds", namespaceUri: NS_SAMPLE, relationshipId: "rel-feeds", reverseOf: "isFedBy" },
+    mkRel("rel-hasComponent", "HasComponent", NS_ISA95, "rel-componentOf"),
+    mkRel("rel-componentOf", "ComponentOf", NS_ISA95, "rel-hasComponent"),
+    mkRel("rel-feeds", "Feeds", NS_SAMPLE, "rel-isFedBy"),
+    mkRel("rel-isFedBy", "IsFedBy", NS_SAMPLE, "rel-feeds"),
 ];
+
+function mkRel(elementId, displayName, namespaceUri, reverseOf) {
+    return { elementId, displayName, namespaceUri, relationshipId: elementId, reverseOf };
+}
 
 // Objects: containers (isComposition) and sensors (leaf values).
 // gen: value generator config for sensors.
@@ -78,7 +134,7 @@ const objectDefs = [
     obj("mach-1", "Filler 01", "type-machine", "line-1"),
     sensor("sensor-temp-1", "Temperature", "mach-1", { kind: "sine", base: 72, amp: 6, period: 12000, unit: "°C" }),
     sensor("sensor-speed-1", "Speed", "mach-1", { kind: "sine", base: 120, amp: 25, period: 9000, unit: "units/min" }),
-    sensor("sensor-state-1", "State", "mach-1", { kind: "enum", states: ["Running", "Idle", "Cleaning", "Fault"], unit: null }),
+    sensor("sensor-state-1", "State", "mach-1", { kind: "enum", states: MACHINE_STATES, unit: null }),
     obj("mach-2", "Capper 01", "type-machine", "line-1"),
     sensor("sensor-torque-1", "Torque", "mach-2", { kind: "sine", base: 8.5, amp: 1.2, period: 7000, unit: "Nm" }),
     sensor("sensor-running-1", "Running", "mach-2", { kind: "bool", period: 8000, unit: null }),
@@ -91,11 +147,44 @@ function obj(elementId, displayName, typeElementId, parentId) {
     return { elementId, displayName, typeElementId, parentId, isComposition: true, gen: null };
 }
 function sensor(elementId, displayName, parentId, gen) {
-    return { elementId, displayName, typeElementId: "type-sensor", parentId, isComposition: false, gen };
+    const typeElementId =
+        gen.kind === "enum" ? "type-sensor-state" : gen.kind === "bool" ? "type-sensor-boolean" : "type-sensor-analog";
+    return { elementId, displayName, typeElementId, parentId, isComposition: false, gen };
 }
 
 const objectsById = new Map(objectDefs.map((o) => [o.elementId, o]));
 const typesById = new Map(objectTypes.map((t) => [t.elementId, t]));
+const relsById = new Map(relationshipTypes.map((r) => [r.elementId, r]));
+
+// ── Relationship graph ─────────────────────────────────────────────────
+
+/**
+ * Directed edges, stored bidirectionally: every edge added here also gets its
+ * reverse (using the relationship type's registered reverseOf).
+ * @type {Map<string, Array<{relationshipType:string, target:string}>>}
+ */
+const edgesByObject = new Map();
+
+function addEdge(from, relationshipType, to) {
+    if (!edgesByObject.has(from)) edgesByObject.set(from, []);
+    edgesByObject.get(from).push({ relationshipType, target: to });
+}
+
+function addBidirectionalEdge(from, relationshipType, to) {
+    addEdge(from, relationshipType, to);
+    addEdge(to, relsById.get(relationshipType).reverseOf, from);
+}
+
+// Hierarchy: parent —HasComponent→ child (and child —ComponentOf→ parent).
+for (const o of objectDefs) {
+    if (o.parentId) addBidirectionalEdge(o.parentId, "rel-hasComponent", o.elementId);
+}
+// A process edge that is not part of the containment hierarchy.
+addBidirectionalEdge("tank-1", "rel-feeds", "mach-1");
+
+function edgesOf(elementId) {
+    return edgesByObject.get(elementId) || [];
+}
 
 // Manual write overrides (writeValue → sticky until overwritten).
 const valueOverrides = new Map();
@@ -148,6 +237,23 @@ function childrenOf(elementId) {
     return objectDefs.filter((o) => o.parentId === elementId);
 }
 
+/**
+ * Flatten a composition tree into the child elementIds reachable within the
+ * given depth. maxDepth follows the spec: 0 = infinite, 1 = no recursion.
+ */
+function descendantsOf(elementId, maxDepth) {
+    const out = [];
+    const walk = (id, depth) => {
+        if (depth === 1) return;
+        for (const child of childrenOf(id)) {
+            out.push(child);
+            walk(child.elementId, depth === 0 ? 0 : depth - 1);
+        }
+    };
+    walk(elementId, maxDepth);
+    return out;
+}
+
 function serializeObject(o, includeMetadata) {
     const base = {
         elementId: o.elementId,
@@ -159,11 +265,20 @@ function serializeObject(o, includeMetadata) {
     };
     if (includeMetadata) {
         const type = typesById.get(o.typeElementId);
+        // Relationships are keyed by relationship type display name, listing the
+        // elementIds reachable over that relationship.
+        const relationships = {};
+        for (const edge of edgesOf(o.elementId)) {
+            const rel = relsById.get(edge.relationshipType);
+            const key = rel ? rel.displayName : edge.relationshipType;
+            if (!relationships[key]) relationships[key] = [];
+            relationships[key].push(edge.target);
+        }
         base.metadata = {
             typeNamespaceUri: type ? type.namespaceUri : null,
             sourceTypeId: o.typeElementId,
             description: o.gen ? `${o.displayName} sensor` : `${o.displayName} container`,
-            relationships: { children: childrenOf(o.elementId).map((c) => c.elementId) },
+            relationships,
             schemaExtensions: o.gen && o.gen.unit ? { engineeringUnit: o.gen.unit } : null,
             system: { isComposition: o.isComposition },
         };
@@ -174,23 +289,29 @@ function serializeObject(o, includeMetadata) {
 // ── Subscriptions ──────────────────────────────────────────────────────
 
 let subCounter = 0;
-const subscriptions = new Map(); // subscriptionId -> { clientId, displayName, items:Set, seq, streams:Set }
+const subscriptions = new Map(); // subscriptionId -> { clientId, displayName, items:Map, seq, streams:Set }
 
 function newSubscription(clientId, displayName) {
     const subscriptionId = "sub-" + ++subCounter;
     subscriptions.set(subscriptionId, {
         clientId,
         displayName: displayName || null,
-        items: new Set(),
+        items: new Map(), // elementId -> maxDepth
         seq: 0,
         streams: new Set(),
     });
     return subscriptionId;
 }
 
+/** A subscription is only visible to the client that created it. */
+function ownedSubscription(subscriptionId, clientId) {
+    const sub = subscriptions.get(subscriptionId);
+    return sub && sub.clientId === clientId ? sub : null;
+}
+
 function subUpdates(sub) {
     const updates = [];
-    for (const eid of sub.items) {
+    for (const eid of sub.items.keys()) {
         const o = objectsById.get(eid);
         if (!o) continue;
         const vqt = currentVQT(o);
@@ -201,18 +322,69 @@ function subUpdates(sub) {
 
 // ── HTTP helpers ───────────────────────────────────────────────────────
 
-function sendJSON(res, status, body) {
-    const json = JSON.stringify(body);
-    res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(json) });
+/**
+ * Send a JSON body, honouring Accept-Encoding: gzip – the spec requires
+ * servers to compress when the client asks for it.
+ */
+function sendJSON(req, res, status, body) {
+    const json = Buffer.from(JSON.stringify(body), "utf8");
+    const accepts = String(req.headers["accept-encoding"] || "").toLowerCase();
+    if (/\bgzip\b/.test(accepts)) {
+        const gz = zlib.gzipSync(json);
+        res.writeHead(status, {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "Content-Length": gz.length,
+            Vary: "Accept-Encoding",
+        });
+        return res.end(gz);
+    }
+    res.writeHead(status, {
+        "Content-Type": "application/json",
+        "Content-Length": json.length,
+        Vary: "Accept-Encoding",
+    });
     res.end(json);
 }
+
 const ok = (result) => ({ success: true, result });
-const okBulk = (results) => ({ success: true, results });
-function errEnv(res, status, title, detail) {
-    sendJSON(res, status, { success: false, responseDetail: { title, status, detail } });
+/** Bulk envelope: top-level success is false as soon as any item failed. */
+const okBulk = (results) => ({ success: results.every((r) => r.success !== false), results });
+
+function errEnv(req, res, status, title, detail) {
+    sendJSON(req, res, status, { success: false, responseDetail: { title, status, detail } });
 }
-function bulkEntry(elementId, result) {
-    return { success: true, elementId, subscriptionId: null, result, responseDetail: null };
+
+function bulkOk(keyField, key, result) {
+    const entry = { success: true, elementId: null, subscriptionId: null, result, responseDetail: null };
+    entry[keyField] = key;
+    return entry;
+}
+
+function bulkFail(keyField, key, status, title, detail) {
+    const entry = {
+        success: false,
+        elementId: null,
+        subscriptionId: null,
+        result: null,
+        responseDetail: { title, status, detail },
+    };
+    entry[keyField] = key;
+    return entry;
+}
+
+const notFoundItem = (keyField, key, what) =>
+    bulkFail(keyField, key, 404, "Not Found", `Unknown ${what}: ${key}`);
+
+/**
+ * Map requested ids to bulk entries, preserving request order and size.
+ * `resolve` returns the result payload, or undefined for a per-item 404.
+ */
+function bulkMap(ids, what, resolve, keyField = "elementId") {
+    return ids.map((id) => {
+        const result = resolve(id);
+        return result === undefined ? notFoundItem(keyField, id, what) : bulkOk(keyField, id, result);
+    });
 }
 
 function readBody(req) {
@@ -256,7 +428,7 @@ const server = http.createServer(async (req, res) => {
 
         // ── Server info ──
         if (method === "GET" && path === "/info") {
-            return sendJSON(res, 200, ok({
+            return sendJSON(req, res, 200, ok({
                 specVersion: SPEC_VERSION,
                 serverVersion: SERVER_VERSION,
                 serverName: SERVER_NAME,
@@ -270,25 +442,25 @@ const server = http.createServer(async (req, res) => {
 
         // ── Explore ──
         if (method === "GET" && path === "/namespaces") {
-            return sendJSON(res, 200, ok(namespaces));
+            return sendJSON(req, res, 200, ok(namespaces));
         }
         if (method === "GET" && path === "/objecttypes") {
             const ns = q.get("namespaceUri");
             const list = ns ? objectTypes.filter((t) => t.namespaceUri === ns) : objectTypes;
-            return sendJSON(res, 200, ok(list));
+            return sendJSON(req, res, 200, ok(list));
         }
         if (method === "POST" && path === "/objecttypes/query") {
             const ids = body.elementIds || [];
-            return sendJSON(res, 200, ok(objectTypes.filter((t) => ids.includes(t.elementId))));
+            return sendJSON(req, res, 200, okBulk(bulkMap(ids, "objectType elementId", (id) => typesById.get(id))));
         }
         if (method === "GET" && path === "/relationshiptypes") {
             const ns = q.get("namespaceUri");
             const list = ns ? relationshipTypes.filter((t) => t.namespaceUri === ns) : relationshipTypes;
-            return sendJSON(res, 200, ok(list));
+            return sendJSON(req, res, 200, ok(list));
         }
         if (method === "POST" && path === "/relationshiptypes/query") {
             const ids = body.elementIds || [];
-            return sendJSON(res, 200, ok(relationshipTypes.filter((t) => ids.includes(t.elementId))));
+            return sendJSON(req, res, 200, okBulk(bulkMap(ids, "relationshipType elementId", (id) => relsById.get(id))));
         }
         if (method === "GET" && path === "/objects") {
             const typeFilter = q.get("typeElementId") || q.get("typeId");
@@ -297,162 +469,216 @@ const server = http.createServer(async (req, res) => {
             let list = objectDefs;
             if (typeFilter) list = list.filter((o) => o.typeElementId === typeFilter);
             if (rootOnly) list = list.filter((o) => o.parentId === null);
-            return sendJSON(res, 200, ok(list.map((o) => serializeObject(o, includeMetadata))));
+            return sendJSON(req, res, 200, ok(list.map((o) => serializeObject(o, includeMetadata))));
         }
         if (method === "POST" && path === "/objects/list") {
             const ids = body.elementIds || [];
             const includeMetadata = !!body.includeMetadata;
-            const list = ids.map((id) => objectsById.get(id)).filter(Boolean);
-            return sendJSON(res, 200, ok(list.map((o) => serializeObject(o, includeMetadata))));
+            const results = bulkMap(ids, "elementId", (id) => {
+                const o = objectsById.get(id);
+                return o ? serializeObject(o, includeMetadata) : undefined;
+            });
+            return sendJSON(req, res, 200, okBulk(results));
         }
         if (method === "POST" && path === "/objects/related") {
             const ids = body.elementIds || [];
             const includeMetadata = !!body.includeMetadata;
-            const seen = new Set();
-            const related = [];
-            for (const id of ids) {
-                for (const child of childrenOf(id)) {
-                    if (seen.has(child.elementId)) continue;
-                    seen.add(child.elementId);
-                    related.push(serializeObject(child, includeMetadata));
-                }
-            }
-            return sendJSON(res, 200, ok(related));
+            const filter = body.relationshipType || null;
+            const results = bulkMap(ids, "elementId", (id) => {
+                if (!objectsById.has(id)) return undefined;
+                return edgesOf(id)
+                    .filter((e) => !filter || e.relationshipType === filter)
+                    .map((e) => ({
+                        sourceRelationship: e.relationshipType,
+                        object: serializeObject(objectsById.get(e.target), includeMetadata),
+                    }));
+            });
+            return sendJSON(req, res, 200, okBulk(results));
         }
 
         // ── Query: current values ──
         if (method === "POST" && path === "/objects/value") {
             const ids = body.elementIds || [];
             const maxDepth = body.maxDepth === undefined ? 1 : body.maxDepth;
-            const results = [];
-            const expand = (id, depth) => {
+            const results = bulkMap(ids, "elementId", (id) => {
                 const o = objectsById.get(id);
-                if (!o) {
-                    results.push({ success: false, elementId: id, subscriptionId: null, result: null,
-                        responseDetail: { title: "Not Found", status: 404, detail: `Unknown elementId: ${id}` } });
-                    return;
-                }
+                if (!o) return undefined;
                 const vqt = currentVQT(o);
-                const result = { value: vqt.value, quality: vqt.quality, timestamp: vqt.timestamp, isComposition: o.isComposition };
-                // Flat fields (elementId/value/quality/timestamp) included for editor live-value widget.
-                results.push(Object.assign(bulkEntry(id, result), vqt));
-                if (depth !== 1) {
-                    for (const child of childrenOf(id)) expand(child.elementId, depth === 0 ? 0 : depth - 1);
+                const result = {
+                    isComposition: o.isComposition,
+                    value: vqt.value,
+                    quality: vqt.quality,
+                    timestamp: vqt.timestamp,
+                };
+                // maxDepth > 1 (0 = infinite) returns the child values keyed by
+                // elementId under "components".
+                if (o.isComposition && maxDepth !== 1) {
+                    const components = {};
+                    for (const child of descendantsOf(id, maxDepth)) {
+                        const cv = currentVQT(child);
+                        components[child.elementId] = {
+                            value: cv.value,
+                            quality: cv.quality,
+                            timestamp: cv.timestamp,
+                        };
+                    }
+                    result.components = components;
                 }
-            };
-            ids.forEach((id) => expand(id, maxDepth));
-            return sendJSON(res, 200, okBulk(results));
+                return result;
+            });
+            return sendJSON(req, res, 200, okBulk(results));
         }
 
         // ── Query: history ──
         if (method === "POST" && path === "/objects/history") {
-            const ids = body.elementIds || [];
-            const parseTs = (v, fallback) => {
-                const t = v ? Date.parse(v) : NaN;
-                return Number.isNaN(t) ? fallback : t;
-            };
-            const end = parseTs(body.endTime, Date.now());
-            const start = parseTs(body.startTime, end - 3600000);
-            const result = ids.map((id) => {
+            // startTime and endTime are required and must be RFC 3339 UTC.
+            for (const field of ["startTime", "endTime"]) {
+                const v = body[field];
+                if (v === undefined || v === null || v === "") {
+                    return errEnv(req, res, 400, "Bad Request", `${field}: Field required`);
+                }
+                if (!UTC_TS_RE.test(String(v)) || Number.isNaN(Date.parse(String(v)))) {
+                    return errEnv(
+                        req, res, 400, "Bad Request",
+                        `${field}: must be an RFC 3339 UTC timestamp (e.g. 2026-01-08T10:30:00Z), got ${JSON.stringify(v)}`
+                    );
+                }
+            }
+            const start = Date.parse(body.startTime);
+            const end = Date.parse(body.endTime);
+            const maxDepth = body.maxDepth === undefined ? 1 : body.maxDepth;
+            const results = bulkMap(ids_(body), "elementId", (id) => {
                 const o = objectsById.get(id);
-                if (!o) return { elementId: id, values: [] };
-                return { elementId: id, values: historyVQTs(o, start, end, 30) };
+                if (!o) return undefined;
+                const result = {
+                    isComposition: o.isComposition,
+                    values: historyVQTs(o, start, end, 30),
+                };
+                if (o.isComposition && maxDepth !== 1) {
+                    const components = {};
+                    for (const child of descendantsOf(id, maxDepth)) {
+                        components[child.elementId] = { values: historyVQTs(child, start, end, 30) };
+                    }
+                    result.components = components;
+                }
+                return result;
             });
-            return sendJSON(res, 200, ok(result));
+            return sendJSON(req, res, 200, okBulk(results));
         }
 
         // ── Update: current values (bulk) ──
         if (method === "PUT" && path === "/objects/value") {
             const updates = body.updates || [];
             const results = updates.map((up) => {
-                const o = objectsById.get(up.elementId);
-                if (!o) {
-                    return { success: false, elementId: up.elementId, subscriptionId: null, result: null,
-                        responseDetail: { title: "Not Found", status: 404, detail: `Unknown elementId: ${up.elementId}` } };
-                }
+                const o = objectsById.get(up && up.elementId);
+                if (!o) return notFoundItem("elementId", up && up.elementId, "elementId");
                 const v = up.value || {};
                 valueOverrides.set(up.elementId, {
                     value: v.value,
                     quality: v.quality || "Good",
                     timestamp: v.timestamp || new Date().toISOString(),
                 });
-                return bulkEntry(up.elementId, null);
+                return bulkOk("elementId", up.elementId, null);
             });
-            return sendJSON(res, 200, okBulk(results));
+            return sendJSON(req, res, 200, okBulk(results));
         }
 
         // ── Update: history (bulk) ──
         if (method === "PUT" && path === "/objects/history") {
             const updates = body.updates || [];
             const results = updates.map((up) => {
-                const o = objectsById.get(up.elementId);
-                if (!o) {
-                    return { success: false, elementId: up.elementId, subscriptionId: null, result: null,
-                        responseDetail: { title: "Not Found", status: 404, detail: `Unknown elementId: ${up.elementId}` } };
-                }
+                const o = objectsById.get(up && up.elementId);
+                if (!o) return notFoundItem("elementId", up && up.elementId, "elementId");
                 const arr = historyWrites.get(up.elementId) || [];
                 const v = up.value || {};
                 arr.push({ value: v.value, quality: v.quality || "Good", timestamp: v.timestamp || new Date().toISOString() });
                 historyWrites.set(up.elementId, arr);
-                return bulkEntry(up.elementId, null);
+                return bulkOk("elementId", up.elementId, null);
             });
-            return sendJSON(res, 200, okBulk(results));
+            return sendJSON(req, res, 200, okBulk(results));
         }
 
         // ── Subscriptions (clientId required on every endpoint) ──
         if (path.startsWith("/subscriptions")) {
-            if (method !== "POST") return errEnv(res, 405, "Method Not Allowed", `${method} ${path}`);
+            if (method !== "POST") return errEnv(req, res, 405, "Method Not Allowed", `${method} ${path}`);
             if (!body.clientId) {
-                return errEnv(res, 400, "Bad Request", "clientId is required on all subscription endpoints");
+                return errEnv(req, res, 400, "Bad Request", "clientId is required on all subscription endpoints");
             }
+            const clientId = body.clientId;
 
             if (path === "/subscriptions") {
-                const id = newSubscription(body.clientId, body.displayName);
-                return sendJSON(res, 200, ok({ subscriptionId: id, clientId: body.clientId, displayName: body.displayName || null }));
+                const id = newSubscription(clientId, body.displayName);
+                return sendJSON(req, res, 200, ok({
+                    subscriptionId: id,
+                    clientId,
+                    displayName: body.displayName || null,
+                }));
             }
             if (path === "/subscriptions/list") {
                 const ids = body.subscriptionIds || [];
-                const list = ids
-                    .filter((id) => subscriptions.has(id))
-                    .map((id) => {
-                        const s = subscriptions.get(id);
-                        return { subscriptionId: id, clientId: s.clientId, displayName: s.displayName,
-                            monitoredItems: Array.from(s.items) };
-                    });
-                return sendJSON(res, 200, ok(list));
+                const results = bulkMap(ids, "subscriptionId", (id) => {
+                    const s = ownedSubscription(id, clientId);
+                    if (!s) return undefined;
+                    return {
+                        subscriptionId: id,
+                        displayName: s.displayName,
+                        monitoredObjects: Array.from(s.items, ([elementId, maxDepth]) => ({ elementId, maxDepth })),
+                    };
+                }, "subscriptionId");
+                return sendJSON(req, res, 200, okBulk(results));
             }
             if (path === "/subscriptions/delete") {
                 const ids = body.subscriptionIds || [];
-                ids.forEach((id) => {
-                    const s = subscriptions.get(id);
-                    if (s) { s.streams.forEach((fn) => fn()); subscriptions.delete(id); }
-                });
-                return sendJSON(res, 200, ok({ deleted: ids }));
+                const results = bulkMap(ids, "subscriptionId", (id) => {
+                    const s = ownedSubscription(id, clientId);
+                    if (!s) return undefined;
+                    s.streams.forEach((fn) => fn());
+                    subscriptions.delete(id);
+                    return null;
+                }, "subscriptionId");
+                return sendJSON(req, res, 200, okBulk(results));
             }
 
-            const sub = subscriptions.get(body.subscriptionId);
-            if (!sub && path !== "/subscriptions") {
-                return errEnv(res, 404, "Not Found", `Unknown subscriptionId: ${body.subscriptionId}`);
+            // The remaining endpoints act on a single subscription. A subscription
+            // belonging to another client is indistinguishable from one that does
+            // not exist.
+            const sub = ownedSubscription(body.subscriptionId, clientId);
+            if (!sub) {
+                return errEnv(req, res, 404, "Not Found", `Unknown subscriptionId: ${body.subscriptionId}`);
             }
 
             if (path === "/subscriptions/register") {
-                (body.elementIds || []).forEach((id) => sub.items.add(id));
-                return sendJSON(res, 200, ok({ subscriptionId: body.subscriptionId, monitoredItems: Array.from(sub.items) }));
+                const ids = body.elementIds || [];
+                const maxDepth = body.maxDepth === undefined || body.maxDepth === null ? 1 : body.maxDepth;
+                const results = bulkMap(ids, "elementId", (id) => {
+                    if (!objectsById.has(id)) return undefined;
+                    sub.items.set(id, maxDepth);
+                    return null;
+                });
+                return sendJSON(req, res, 200, okBulk(results));
             }
             if (path === "/subscriptions/unregister") {
-                (body.elementIds || []).forEach((id) => sub.items.delete(id));
-                return sendJSON(res, 200, ok({ subscriptionId: body.subscriptionId, monitoredItems: Array.from(sub.items) }));
+                const ids = body.elementIds || [];
+                const results = bulkMap(ids, "elementId", (id) => {
+                    if (!sub.items.has(id)) return undefined;
+                    sub.items.delete(id);
+                    return null;
+                });
+                return sendJSON(req, res, 200, okBulk(results));
             }
             if (path === "/subscriptions/sync") {
-                // lastSequenceNumber acknowledges; we always generate a fresh batch.
+                // lastSequenceNumber acknowledges; -1 clears the whole queue.
                 sub.seq += 1;
                 const batch = { sequenceNumber: sub.seq, updates: subUpdates(sub) };
-                return sendJSON(res, 200, ok([batch]));
+                return sendJSON(req, res, 200, ok([batch]));
             }
             if (path === "/subscriptions/stream") {
                 if (!STREAM_ENABLED) {
-                    return errEnv(res, 501, "Not Implemented", "SSE streaming is disabled; use /subscriptions/sync polling");
+                    return errEnv(req, res, 501, "Not Implemented", "SSE streaming is disabled; use /subscriptions/sync polling");
                 }
+                // Only one stream per subscription: opening a new one closes the
+                // existing stream cleanly (no error) before taking over.
+                sub.streams.forEach((fn) => fn());
                 res.writeHead(200, {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
@@ -465,19 +691,31 @@ const server = http.createServer(async (req, res) => {
                     res.write(`data: ${JSON.stringify(batch)}\n\n`);
                 };
                 const interval = setInterval(tick, 2000);
-                const cleanup = () => { clearInterval(interval); sub.streams.delete(cleanup); };
+                const cleanup = () => {
+                    clearInterval(interval);
+                    sub.streams.delete(cleanup);
+                    res.end();
+                };
                 sub.streams.add(cleanup);
-                req.on("close", cleanup);
+                req.on("close", () => {
+                    clearInterval(interval);
+                    sub.streams.delete(cleanup);
+                });
                 return; // keep the connection open
             }
-            return errEnv(res, 404, "Not Found", `Unknown subscription endpoint: ${path}`);
+            return errEnv(req, res, 404, "Not Found", `Unknown subscription endpoint: ${path}`);
         }
 
-        return errEnv(res, 404, "Not Found", `No route for ${method} ${path}`);
+        return errEnv(req, res, 404, "Not Found", `No route for ${method} ${path}`);
     } catch (err) {
-        return errEnv(res, 500, "Internal Server Error", err.message);
+        return errEnv(req, res, 500, "Internal Server Error", err.message);
     }
 });
+
+/** elementIds from a request body, defaulting to an empty list. */
+function ids_(body) {
+    return body.elementIds || [];
+}
 
 server.listen(PORT, () => {
     /* eslint-disable no-console */

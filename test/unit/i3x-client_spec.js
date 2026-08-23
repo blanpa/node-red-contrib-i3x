@@ -3,6 +3,7 @@
 const { expect } = require("chai");
 const sinon = require("sinon");
 const nock = require("nock");
+const { Readable } = require("stream");
 const I3XClient = require("../../lib/i3x-client");
 
 const BASE = "https://i3x-test.example.com";
@@ -261,6 +262,29 @@ describe("I3XClient", function () {
             await client.readHistory(["obj1"], { startTime: "2025-01-01T00:00:00Z" });
             expect(sent.endTime).to.be.a("string");
             expect(Number.isNaN(Date.parse(sent.endTime))).to.equal(false);
+        });
+
+        it("should default startTime to one hour before endTime (1.0 requires it)", async function () {
+            let sent;
+            nock(BASE)
+                .post("/objects/history", (b) => { sent = b; return true; })
+                .reply(200, {});
+
+            client = new I3XClient({ baseUrl: BASE });
+            await client.readHistory(["obj1"], { endTime: "2025-01-02T00:00:00Z" });
+            expect(sent.startTime).to.equal("2025-01-01T23:00:00.000Z");
+        });
+
+        it("should default both ends of the range when neither is given", async function () {
+            let sent;
+            nock(BASE)
+                .post("/objects/history", (b) => { sent = b; return true; })
+                .reply(200, {});
+
+            client = new I3XClient({ baseUrl: BASE });
+            await client.readHistory(["obj1"]);
+            const span = Date.parse(sent.endTime) - Date.parse(sent.startTime);
+            expect(span).to.equal(3600000);
         });
     });
 
@@ -561,6 +585,138 @@ describe("I3XClient", function () {
             client = new I3XClient({ baseUrl: BASE, clientId: "test-client" });
             const result = await client.syncSubscription("42", { lastSequenceNumber: -1 });
             expect(result).to.deep.equal([]);
+        });
+
+        it("should flag _overflow on a 206 response (dropped updates)", async function () {
+            const data = [{ sequenceNumber: 9, updates: [{ elementId: "obj1", value: 1 }] }];
+            nock(BASE)
+                .post("/subscriptions/sync", { clientId: "test-client", subscriptionId: "42" })
+                .reply(206, data);
+
+            client = new I3XClient({ baseUrl: BASE, clientId: "test-client" });
+            const result = await client.syncSubscription("42");
+            expect(result._overflow).to.equal(true);
+            // Flag must not leak into the serialised payload
+            expect(JSON.parse(JSON.stringify(result))).to.deep.equal(data);
+        });
+
+        it("should not flag _overflow on a normal 200 response", async function () {
+            nock(BASE)
+                .post("/subscriptions/sync", { clientId: "test-client", subscriptionId: "42" })
+                .reply(200, []);
+
+            client = new I3XClient({ baseUrl: BASE, clientId: "test-client" });
+            const result = await client.syncSubscription("42");
+            expect(result._overflow).to.equal(undefined);
+        });
+    });
+
+    // ── SSE event parsing ──────────────────────────────────────────
+
+    describe("_parseSSEEvent()", function () {
+        it("should extract a single data field", function () {
+            expect(I3XClient._parseSSEEvent("data: {\"a\":1}")).to.equal("{\"a\":1}");
+        });
+
+        it("should concatenate multiple data fields with newlines", function () {
+            expect(I3XClient._parseSSEEvent("data: {\ndata: \"a\": 1\ndata: }")).to.equal("{\n\"a\": 1\n}");
+        });
+
+        it("should ignore comment lines and non-data fields", function () {
+            const block = ": keep-alive\nevent: update\nid: 7\nretry: 1000\ndata: 42";
+            expect(I3XClient._parseSSEEvent(block)).to.equal("42");
+        });
+
+        it("should strip only a single leading space from the value", function () {
+            expect(I3XClient._parseSSEEvent("data:  spaced")).to.equal(" spaced");
+        });
+
+        it("should handle a data field with no value", function () {
+            expect(I3XClient._parseSSEEvent("data:")).to.equal("");
+            expect(I3XClient._parseSSEEvent("data")).to.equal("");
+        });
+
+        it("should return undefined for an event carrying no data", function () {
+            expect(I3XClient._parseSSEEvent(": heartbeat\nevent: ping")).to.equal(undefined);
+        });
+    });
+
+    // ── streamSubscription (SSE framing) ───────────────────────────
+
+    describe("streamSubscription()", function () {
+        /** Collect events until `count` have arrived, then resolve. */
+        function collect(handleFactory, count) {
+            return new Promise((resolve, reject) => {
+                const events = [];
+                const timer = setTimeout(
+                    () => reject(new Error("timed out after " + events.length + " events")),
+                    4000
+                );
+                const handle = handleFactory((event) => {
+                    events.push(event);
+                    if (events.length === count) {
+                        clearTimeout(timer);
+                        handle.close();
+                        resolve(events);
+                    }
+                });
+            });
+        }
+
+        it("should parse CRLF-framed events and multi-byte characters split across chunks", async function () {
+            // "Grün" – the ü (0xC3 0xBC) is deliberately split across two chunks,
+            // and events are separated by CRLF pairs rather than bare LFs.
+            const payload = Buffer.from("event: update\r\ndata: {\"name\":\"Grün\"}\r\n\r\n", "utf8");
+            const splitAt = payload.indexOf(0xbc); // second byte of "ü"
+            const chunks = [
+                payload.subarray(0, splitAt),
+                payload.subarray(splitAt),
+                Buffer.from("data: {\"name\":\"zwei\"}\r\n\r\n", "utf8"),
+            ];
+
+            nock(BASE)
+                .post("/subscriptions/stream", { clientId: "test-client", subscriptionId: "42" })
+                .reply(200, () => Readable.from(chunks), {
+                    "Content-Type": "text/event-stream",
+                });
+
+            client = new I3XClient({ baseUrl: BASE, clientId: "test-client" });
+            const events = await collect(
+                (onData) => client.streamSubscription("42", { onData }),
+                2
+            );
+            expect(events).to.deep.equal([{ name: "Grün" }, { name: "zwei" }]);
+        });
+
+        it("should join multi-line data fields and skip heartbeat comments", async function () {
+            const body = ": heartbeat\n\ndata: {\ndata: \"value\": 7\ndata: }\n\n";
+            nock(BASE)
+                .post("/subscriptions/stream")
+                .reply(200, body, { "Content-Type": "text/event-stream" });
+
+            client = new I3XClient({ baseUrl: BASE, clientId: "test-client" });
+            const events = await collect(
+                (onData) => client.streamSubscription("42", { onData }),
+                1
+            );
+            expect(events).to.deep.equal([{ value: 7 }]);
+        });
+
+        it("should surface a 501 as an error instead of reconnecting", async function () {
+            nock(BASE).post("/subscriptions/stream").reply(501, { success: false });
+
+            client = new I3XClient({ baseUrl: BASE, clientId: "test-client" });
+            const err = await new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error("no error raised")), 4000);
+                client.streamSubscription("42", {
+                    onData: () => {},
+                    onError: (e) => {
+                        clearTimeout(timer);
+                        resolve(e);
+                    },
+                });
+            });
+            expect(err.statusCode).to.equal(501);
         });
     });
 

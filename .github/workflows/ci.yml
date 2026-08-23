@@ -30,8 +30,20 @@ jobs:
 
     strategy:
       fail-fast: false
+      # Node 18 and 20 are end-of-life. Node-RED 5 requires Node >= 22.9, so the
+      # 4.x rows keep coverage for users still on older Node-RED installs.
       matrix:
-        node-version: [18, 20, 22]
+        include:
+          - node-version: 20
+            node-red: "4"
+          - node-version: 22
+            node-red: "4"
+          - node-version: 22
+            node-red: "5"
+          - node-version: 24
+            node-red: "5"
+
+    name: test (node ${{ matrix.node-version }}, node-red ${{ matrix.node-red }})
 
     steps:
       - name: Checkout
@@ -45,5 +57,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Node-RED ${{ matrix.node-red }}.x
+        run: npm install --no-save --no-package-lock node-red@${{ matrix.node-red }}
+
       - name: Run tests
         run: npm test
+
+  conformance:
+    name: i3X 1.0 conformance (reference mock)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Runs the official CESMII conformance suite (60 tests) against the
+      # bundled reference mock server. The mock backs the local dev environment
+      # and the demo flows, so it must stay spec-compliant.
+      - name: Run the i3X conformance suite
+        run: npm run test:conformance

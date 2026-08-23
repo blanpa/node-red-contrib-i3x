@@ -4,14 +4,14 @@
         "type": "tab",
         "label": "i3X Complete Demo",
         "disabled": false,
-        "info": "Complete demo of all i3X nodes against the public CESMII demo server.\n\n**Server:** https://i3x.cesmii.net\n**Auth:** None (public)\n\nThis flow demonstrates all 5 operation nodes:\n1. **Browse** – Explore the information model\n2. **Read** – Read current values\n3. **Write** – Write values\n4. **History** – Query historical data\n5. **Subscribe** – Monitor value changes"
+        "info": "Complete demo of all i3X nodes against the public CESMII i3X 1.0 demo server.\n\n**Server:** https://api.i3x.dev/v1\n**Auth:** None (public)\n\nThis flow demonstrates all 5 operation nodes:\n1. **Browse** – Explore the information model\n2. **Read** – Read current values\n3. **Write** – Write values\n4. **History** – Query historical data\n5. **Subscribe** – Monitor value changes"
     },
     {
         "id": "i3x-demo-server",
         "type": "i3x-server",
         "name": "CESMII Demo",
-        "baseUrl": "https://i3x.cesmii.net",
-        "apiVersion": "",
+        "baseUrl": "https://api.i3x.dev",
+        "apiVersion": "v1",
         "authType": "none",
         "timeout": "10000",
         "tlsConfig": ""

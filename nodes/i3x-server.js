@@ -4,6 +4,7 @@
 "use strict";
 
 const I3XClient = require("../lib/i3x-client");
+const { flattenRelated, flattenValues } = require("../lib/node-utils");
 
 module.exports = function (RED) {
     function I3XServerNode(config) {
@@ -153,7 +154,9 @@ module.exports = function (RED) {
                 [req.params.elementId],
                 { includeMetadata: true }
             );
-            res.json(result);
+            // The 1.0 bulk shape nests edges under result[].result[].object –
+            // the browse tree wants a flat list of object records.
+            res.json(flattenRelated(result, req.params.elementId));
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -212,7 +215,9 @@ module.exports = function (RED) {
             // Limit batch size to prevent abuse
             const ids = elementIds.slice(0, 50);
             const result = await node.client.readValues(ids, { maxDepth: 1 });
-            res.json(result);
+            // The 1.0 bulk shape nests the VQT under result[].result – the
+            // live-value widget wants flat {elementId, value, quality, timestamp}.
+            res.json(flattenValues(result));
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
