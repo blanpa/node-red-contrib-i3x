@@ -374,4 +374,15 @@ node-red
 
 ## License
 
-MIT – see [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Copyright 2026 blanpa
+
+## Forks
+
+Forks are welcome. If you publish a fork under a different package name, please
+also rename the Node-RED node type IDs (for example `myprefix-i3x-*`) and
+use your own palette category. Node-RED refuses to register a node type that is
+already claimed, so identical type IDs make it impossible to install both
+packages side by side.
+

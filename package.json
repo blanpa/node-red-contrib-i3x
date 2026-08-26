@@ -15,7 +15,7 @@
     "opc-ua",
     "smart-manufacturing"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/blanpa/node-red-contrib-i3x"
