@@ -2,9 +2,11 @@
 
 [![npm version](https://img.shields.io/npm/v/node-red-contrib-i3x.svg)](https://www.npmjs.com/package/node-red-contrib-i3x)
 [![CI](https://github.com/blanpa/node-red-contrib-i3x/actions/workflows/ci.yml/badge.svg)](https://github.com/blanpa/node-red-contrib-i3x/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/node/v/node-red-contrib-i3x.svg)](https://nodejs.org)
 [![i3X API](https://img.shields.io/badge/i3X%20API-1.0%20Release-5DB87C.svg)](https://www.i3x.dev)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/blanpa)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/blanpa)
 
 Node-RED nodes for the **i3X** (Industrial Information Interoperability eXchange) API by [CESMII](https://www.cesmii.org).
 
