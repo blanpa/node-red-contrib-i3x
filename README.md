@@ -5,8 +5,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/node/v/node-red-contrib-i3x.svg)](https://nodejs.org)
 [![i3X API](https://img.shields.io/badge/i3X%20API-1.0%20Release-5DB87C.svg)](https://www.i3x.dev)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/blanpa)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/blanpa)
+[![Sponsor](https://img.shields.io/github/sponsors/blanpa?label=Sponsor&logo=githubsponsors&logoColor=white&color=EA4AAA)](https://github.com/sponsors/blanpa)
 
 Node-RED nodes for the **i3X** (Industrial Information Interoperability eXchange) API by [CESMII](https://www.cesmii.org).
 
@@ -381,6 +380,18 @@ node-red
 - [i3X Specification & RFC](https://github.com/cesmii/i3X)
 - [i3X SDK Documentation](https://www.i3x.dev/sdk)
 - [CESMII](https://www.cesmii.org)
+
+## Sponsor this project
+
+This package is developed and maintained in my own time.
+If it saves you some, consider supporting it:
+
+<a href="https://github.com/sponsors/blanpa">
+  <img height="41" alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor%20on%20GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white">
+</a>
+<a href="https://buymeacoffee.com/blanpa">
+  <img height="41" alt="Buy Me a Coffee" src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png">
+</a>
 
 ## License
 
