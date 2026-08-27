@@ -2,6 +2,11 @@
 
 ## 0.0.9 (2026-08-26)
 
+Bug-fix and tooling release. The client remains feature-complete against the
+**i3X API 1.0 Release**; the spec itself is unchanged (last spec commit
+2026-06-18, vNext not chartered before late 2026), so no endpoints were added
+or removed.
+
 ### Changed
 
 - **License changed from MIT to Apache-2.0.** Apache-2.0 is the license
@@ -17,6 +22,67 @@
   their own package name are asked to rename their Node-RED node type IDs and
   use their own palette category, so both packages can be installed side by
   side.
+
+### Fixed
+
+- **History queries failed when no start time was set** – the 1.0 spec marks
+  both `startTime` and `endTime` as required, and a live server answers
+  `400 "startTime: Field required"`. 0.0.8 fixed this for `endTime` only.
+  `readHistory()` (and the `i3x-history` node with a blank **Start Time**) now
+  defaults an omitted `startTime` to one hour before `endTime`.
+- **The editor's live-value widget always showed "–"** – a conformant 1.0
+  server nests the VQT under `results[].result`, but the browser widget read
+  `results[].value`. The `browse/values` admin endpoint now normalises the bulk
+  shape (new `flattenValues()` helper). Only the bundled mock's non-standard
+  flat fields made this work before.
+- **The editor's browse tree found no children** – `POST /objects/related`
+  returns edges under `results[].result[].object`, but the tree expected a flat
+  object list, so every node reported "No children" against a real server. The
+  `browse/related` admin endpoint now flattens the bulk shape (new
+  `flattenRelated()` helper).
+- **Queue overflow on `/subscriptions/sync` was silently ignored** – the spec
+  returns `206` when the server drops updates because the subscription queue
+  overflowed. `syncSubscription()` now flags this (non-enumerable `_overflow`
+  on the returned batches) and `i3x-subscribe` emits a warning.
+- **SSE framing was too narrow** – events were split on `\n\n` only (a
+  CRLF-framed stream produced no events at all), only the first `data:` line of
+  an event was read (the spec concatenates multiple `data:` fields), and
+  multi-byte UTF-8 characters were corrupted when split across chunk
+  boundaries. Parsing now follows the SSE spec and decodes via `StringDecoder`.
+- **The public demo server `i3x.cesmii.net` is gone** – it no longer completes
+  a TLS handshake, which failed all 19 live integration tests in
+  `docker compose run --rm test`. Every reference (Compose, README, editor
+  placeholders, demo flow, JSDoc) now points at `https://api.i3x.dev/v1`.
+- **The `API Version` field suggested `v0`** – the 1.0 spec requires a
+  versioned endpoint; the placeholder and help text now say `v1`.
+
+### Changed
+
+- **The bundled reference mock server is now spec-compliant.** It failed 20 of
+  the 60 official conformance tests (missing bulk envelopes, non-symmetric
+  `reverseOf`, values not matching their type schema, no `clientId` scoping,
+  no gzip, history without required time bounds). It now reports **Full 1.0
+  Compliance** — 55 passed, 0 failed. Notable behaviour changes: bulk responses
+  everywhere with per-item 404s, typed sensors (`AnalogSensor` / `StateSensor`
+  / `BooleanSensor`), a bidirectional relationship graph, composition support
+  via `maxDepth` for values *and* history, `clientId`-scoped subscriptions,
+  single-stream-per-subscription, and gzip.
+- **Node.js baseline raised to 20** (`engines.node >= 20.0.0`). Node 18 has been
+  end-of-life since April 2025.
+- Dependencies: axios `^1.19.0`, ESLint `^10.9.0`, `@eslint/js` `^10.0.1`,
+  c8 `^12.0.0`, sinon `^22.1.0`. chai stays on `^4` (v5+ is ESM-only).
+- Docker base images moved from Node 18 to Node 22.
+- The i3X Explorer image is pinned to an upstream commit for reproducible
+  builds; build with `--build-arg EXPLORER_REF=main` to track HEAD.
+
+### Added
+
+- **`npm run test:conformance`** – runs the official
+  [CESMII i3X 1.0 Conformance Test Suite](https://github.com/cesmii/i3X/tree/1.0/conformance-tests)
+  (60 tests) against the bundled mock. The suite is fetched on demand into
+  `.conformance/`; a new CI job runs it on every push.
+- **CI now tests against Node-RED 5**, released 2026-06-09 (Node 20/22 with
+  Node-RED 4, Node 22/24 with Node-RED 5). All tests pass on Node-RED 5.0.4.
 
 ## 0.0.8 (2026-06-22)
 

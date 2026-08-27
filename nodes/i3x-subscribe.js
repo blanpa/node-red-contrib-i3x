@@ -108,6 +108,15 @@ module.exports = function (RED) {
                         opts.lastSequenceNumber = node._lastSequenceNumber;
                     }
                     const batches = await client.syncSubscription(node._subscriptionId, opts);
+                    if (batches && batches._overflow) {
+                        // 1.0 spec: HTTP 206 – the server dropped updates because
+                        // the subscription queue overflowed. Poll faster or watch
+                        // fewer elements.
+                        node.warn(
+                            "Subscription queue overflowed – some updates were dropped by the server. " +
+                            "Consider a shorter polling interval or fewer monitored elements."
+                        );
+                    }
                     // 1.0 spec: [{sequenceNumber, updates: [...]}, ...]
                     const updates = [];
                     for (const batch of Array.isArray(batches) ? batches : []) {

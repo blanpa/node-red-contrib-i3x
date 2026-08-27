@@ -14,7 +14,7 @@ export interface TlsOptions {
 }
 
 export interface I3XClientConfig {
-    /** Root URL of the i3X server, e.g. "https://i3x.cesmii.net". */
+    /** Root URL of the i3X server, e.g. "https://api.i3x.dev". */
     baseUrl: string;
     /** Optional path prefix, e.g. "v1". */
     apiVersion?: string;
@@ -116,6 +116,10 @@ export default class I3XClient extends EventEmitter {
 
     // Query
     readValues(elementIds: string[], options?: { maxDepth?: number }): Promise<unknown[]>;
+    /**
+     * The 1.0 spec requires both ends of the range: an omitted `endTime`
+     * defaults to now, an omitted `startTime` to one hour before `endTime`.
+     */
     readHistory(
         elementIds: string[],
         options?: { startTime?: string; endTime?: string; maxDepth?: number }
@@ -150,10 +154,14 @@ export default class I3XClient extends EventEmitter {
         callbacks: StreamCallbacks | ((event: unknown) => void),
         options?: StreamOptions | number
     ): StreamHandle;
+    /**
+     * Returned batches carry a non-enumerable `_overflow` flag when the server
+     * answered 206, i.e. it dropped updates because the queue overflowed.
+     */
     syncSubscription(
         subscriptionId: string,
         options?: { lastSequenceNumber?: number; clientId?: string }
-    ): Promise<unknown>;
+    ): Promise<unknown[] & { _overflow?: boolean }>;
 
     // Utility
     testConnection(): Promise<boolean>;
