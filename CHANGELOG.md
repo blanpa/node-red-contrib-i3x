@@ -1,11 +1,27 @@
 # Changelog
 
-## 0.0.9 (2026-08-23)
+## 0.0.9 (2026-08-26)
 
 Bug-fix and tooling release. The client remains feature-complete against the
 **i3X API 1.0 Release**; the spec itself is unchanged (last spec commit
 2026-06-18, vNext not chartered before late 2026), so no endpoints were added
 or removed.
+
+### Changed
+
+- **License changed from MIT to Apache-2.0.** Apache-2.0 is the license
+  Node-RED itself uses. Compared to MIT it adds an explicit patent grant
+  (section 3), keeps attribution intact downstream through the new `NOTICE`
+  file (section 4d), and requires modified files to be marked as changed
+  (section 4b). It remains fully permissive: commercial use, closed-source
+  derivatives and forks are all still allowed.
+- **`NOTICE` added** and verified to ship inside the npm tarball.
+- **Contributing and fork guidance in the README.** Pull requests are welcome,
+  including large ones — an issue up front means substantial work can usually
+  land here instead of in a parallel package. Forks that are published under
+  their own package name are asked to rename their Node-RED node type IDs and
+  use their own palette category, so both packages can be installed side by
+  side.
 
 ### Fixed
 
